@@ -798,6 +798,32 @@
     </div>
 </div>
 
+<!-- نافذة إصلاح RLS -->
+<div id="rls-fix-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9000;justify-content:center;align-items:center;padding:20px;">
+    <div style="background:#162029;border:1px solid #1e90ff;border-radius:20px;padding:25px 20px;max-width:420px;width:100%;position:relative;">
+        <button onclick="document.getElementById('rls-fix-modal').style.display='none'" style="position:absolute;top:12px;left:12px;background:rgba(255,255,255,0.1);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
+        <div style="font-size:2rem;text-align:center;margin-bottom:10px;">⚠️</div>
+        <h3 style="color:#f1c40f;text-align:center;margin:0 0 10px;">يجب تفعيل صلاحيات جدول stories</h3>
+        <p style="color:#8e99a2;font-size:0.85rem;text-align:center;margin-bottom:15px;">اذهب إلى <b style="color:white;">Supabase → SQL Editor</b> والصق هذا الكود:</p>
+        <div style="background:#0b1116;border:1px solid #24313d;border-radius:12px;padding:15px;font-family:monospace;font-size:0.75rem;color:#2ecc71;line-height:1.7;white-space:pre-wrap;overflow-x:auto;" id="rls-sql-block">-- 1) إنشاء الجدول إن لم يكن موجوداً
+CREATE TABLE IF NOT EXISTS stories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID,
+  image_url TEXT NOT NULL,
+  text_overlay TEXT DEFAULT '',
+  font_style TEXT DEFAULT 'Tajawal',
+  text_color TEXT DEFAULT '#ffffff',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours')
+);
+
+-- 2) تعطيل RLS (أسهل حل)
+ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
+        <button onclick="_copyRlsSql()" id="rls-copy-btn" style="width:100%;margin-top:14px;background:#1e90ff;color:white;border:none;padding:13px;border-radius:12px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:'Tajawal',sans-serif;">📋 نسخ الكود</button>
+        <p style="color:#8e99a2;font-size:0.78rem;text-align:center;margin:10px 0 0;">بعد تشغيل الكود في Supabase، انشر الستوري مجدداً</p>
+    </div>
+</div>
+
 <!-- عارض الستوري -->
 <div id="story-viewer-modal" style="display:none; position:fixed; inset:0; background:#000; z-index:7000; flex-direction:column;">
     <div style="position:relative; flex:1;">
@@ -2558,21 +2584,51 @@
             }]);
 
             if (insertErr) {
-                // إذا لم يكن جدول stories موجوداً، نعطي رسالة واضحة
-                if (insertErr.message.includes('does not exist') || insertErr.code === '42P01') {
-                    alert('⚠️ يرجى إنشاء جدول "stories" في Supabase:\n\nCREATE TABLE stories (\n  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,\n  user_id UUID,\n  image_url TEXT NOT NULL,\n  text_overlay TEXT DEFAULT \'\',\n  font_style TEXT DEFAULT \'Tajawal\',\n  text_color TEXT DEFAULT \'#ffffff\',\n  created_at TIMESTAMPTZ DEFAULT NOW(),\n  expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL \'24 hours\')\n);');
+                // جدول غير موجود أو خطأ RLS — نفتح نافذة الإصلاح
+                const isRls = insertErr.message.includes('row-level security') || insertErr.code === '42501';
+                const isMissing = insertErr.message.includes('does not exist') || insertErr.code === '42P01';
+                if (isRls || isMissing) {
+                    document.getElementById('rls-fix-modal').style.display = 'flex';
                 } else {
-                    throw insertErr;
+                    alert('خطأ: ' + insertErr.message);
                 }
             } else {
                 closeStoryEditor();
                 loadStories();
-                alert('✅ تم نشر الستوري بنجاح!');
+                _showStorySuccessToast();
             }
         } catch(err) {
             alert('حدث خطأ: ' + err.message);
         } finally {
             btn.textContent = origText; btn.disabled = false;
+        }
+    }
+
+    function _showStorySuccessToast() {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#2ecc71;color:white;padding:12px 24px;border-radius:25px;font-weight:bold;font-size:0.95rem;z-index:9999;box-shadow:0 4px 20px rgba(46,204,113,0.5);animation:slideIn 0.3s ease-out;';
+        toast.textContent = '✅ تم نشر الستوري بنجاح!';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
+
+    function _copyRlsSql() {
+        const sql = document.getElementById('rls-sql-block').textContent;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(sql).then(() => {
+                const btn = document.getElementById('rls-copy-btn');
+                btn.textContent = '✅ تم النسخ!';
+                btn.style.background = '#2ecc71';
+                setTimeout(() => { btn.textContent = '📋 نسخ الكود'; btn.style.background = '#1e90ff'; }, 2500);
+            });
+        } else {
+            const ta = document.createElement('textarea');
+            ta.value = sql; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            document.execCommand('copy'); document.body.removeChild(ta);
+            const btn = document.getElementById('rls-copy-btn');
+            btn.textContent = '✅ تم النسخ!'; btn.style.background = '#2ecc71';
+            setTimeout(() => { btn.textContent = '📋 نسخ الكود'; btn.style.background = '#1e90ff'; }, 2500);
         }
     }
 
