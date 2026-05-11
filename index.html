@@ -3435,15 +3435,36 @@
             // إشعار المستخدم المتابَع من نتائج البحث
             sendNotif(userId, '👤 متابع جديد', `بدأ ${myName} بمتابعتك`);
         }
+        await _updateFollowCounts(userId, currentUser.id, !isNowFollowing);
+    }
+
+    // ---- تحديث عدادات المتابعة مباشرةً في قاعدة البيانات ----
+    async function _updateFollowCounts(targetUserId, myUserId, isFollow) {
         try {
-            if (!isNowFollowing) {
-                await _supabase.rpc('increment_followers', { user_id: userId });
-                await _supabase.rpc('increment_following', { user_id: currentUser.id });
-            } else {
-                await _supabase.rpc('decrement_followers', { user_id: userId });
-                await _supabase.rpc('decrement_following', { user_id: currentUser.id });
-            }
-        } catch(e) {}
+            // جلب الأعداد الحالية للمستخدمين
+            const [{ data: tgt }, { data: me }] = await Promise.all([
+                _supabase.from('profiles').select('followers_count, following_count').eq('id', targetUserId).maybeSingle(),
+                _supabase.from('profiles').select('followers_count, following_count').eq('id', myUserId).maybeSingle()
+            ]);
+
+            const tgtFollowers = tgt?.followers_count || 0;
+            const meFollowing  = me?.following_count  || 0;
+
+            const newTgtFollowers = isFollow ? tgtFollowers + 1 : Math.max(0, tgtFollowers - 1);
+            const newMeFollowing  = isFollow ? meFollowing  + 1 : Math.max(0, meFollowing  - 1);
+
+            await Promise.all([
+                _supabase.from('profiles').update({ followers_count: newTgtFollowers }).eq('id', targetUserId),
+                _supabase.from('profiles').update({ following_count: newMeFollowing  }).eq('id', myUserId)
+            ]);
+
+            // تحديث العداد في نافذة البروفايل المفتوحة لو كانت تخص هذا المستخدم
+            const elF = document.getElementById('umod-followers');
+            if (elF && _viewingUserId === targetUserId) elF.textContent = newTgtFollowers;
+
+            // تحديث عدادات المستخدم الحالي في الواجهة
+            currentUserFollowing = newMeFollowing;
+        } catch(e) { console.error('_updateFollowCounts:', e); }
     }
 
     // ---- دالة مساعدة لإرسال الإشعارات ----
@@ -3556,15 +3577,7 @@
             sendNotif(_viewingUserId, '👤 متابع جديد', `بدأ ${myName} بمتابعتك`);
         }
 
-        try {
-            if (!isFollowing) {
-                await _supabase.rpc('increment_followers', { user_id: _viewingUserId });
-                await _supabase.rpc('increment_following', { user_id: currentUser.id });
-            } else {
-                await _supabase.rpc('decrement_followers', { user_id: _viewingUserId });
-                await _supabase.rpc('decrement_following', { user_id: currentUser.id });
-            }
-        } catch(e) {}
+        await _updateFollowCounts(_viewingUserId, currentUser.id, !isFollowing);
     }
 
     // ========================================================
