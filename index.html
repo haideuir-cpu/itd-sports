@@ -940,13 +940,6 @@
             <div id="theme-switch" class="switch"></div>
         </div>
 
-        <h3 style="margin-top: 30px; margin-bottom: 20px;">الدعم والتواصل</h3>
-        <div class="more-item" onclick="alert('سيتم فتح نموذج الدعم الفني قريباً')">
-            <div>
-                <svg viewBox="0 0 24 24"><path d="M20,2H4C2.9,2,2,2.9,2,4v12c0,1.1,0.9,2,2,2h14l4,4V4C22,2.9,21.1,2,20,2z"/></svg>
-                الإبلاغ عن مشكلة
-            </div>
-        </div>
     </div>
 </main>
 
@@ -1614,15 +1607,10 @@
                             </div>
                             ${usernameHtml}
                             ${verifiedPillHtml}
-                            <div style="color:#8e99a2;font-size:0.78rem;margin-bottom:12px;margin-top:${currentUserIsVerified ? '8px' : '0'};">${currentUser.email}</div>
                             <span style="background: rgba(241, 196, 15, 0.15); border: 1px solid var(--gold); padding: 4px 12px; border-radius: 20px; color: var(--gold); font-weight: bold; font-size: 0.88rem;">⭐ ${currentUserPoints} نقطة</span>
                         </div>
                     </div>
 
-                    <div style="background: #8e54e9; border-radius: 25px; padding: 16px 25px; display: flex; justify-content: space-between; align-items: center; color: white; font-weight: bold; margin-bottom: 25px; cursor: pointer;" onclick="alert('قسم المفضلة قريباً')">
-                        <span style="font-size: 1.1rem;">المفضلة</span>
-                        <svg viewBox="0 0 24 24" style="width: 24px; height: 24px; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                    </div>
 
                     <div class="more-item" onclick="toggleProfileEditMode()">
                         <div>
