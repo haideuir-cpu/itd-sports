@@ -407,10 +407,22 @@
         .sv-user-name { color: white; font-weight: bold; font-size: 0.95rem; flex: 1; text-shadow: 1px 1px 3px #000; }
         .sv-time { color: rgba(255,255,255,0.7); font-size: 0.78rem; text-shadow: 1px 1px 3px #000; }
         .sv-close-btn { color: white; font-size: 1.4rem; cursor: pointer; background: rgba(0,0,0,0.4); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: none; }
-        .sv-img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
-        .sv-text-layer { position: absolute; z-index: 10; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; padding: 10px 20px; color: white; font-size: 1.5rem; text-shadow: 1px 1px 6px rgba(0,0,0,0.9); pointer-events: none; max-width: 90%; word-break: break-word; }
+        .sv-img { width: 100%; height: 100%; object-fit: contain; position: absolute; inset: 0; background: #000; }
+        .sv-text-layer { position: absolute; z-index: 10; text-align: center; padding: 10px 20px; color: white; font-size: 1.5rem; text-shadow: 1px 1px 6px rgba(0,0,0,0.9); pointer-events: none; max-width: 90%; word-break: break-word; transform: translate(-50%, -50%); }
         .sv-tap-left { position: absolute; left: 0; top: 0; bottom: 0; width: 35%; z-index: 15; cursor: pointer; }
         .sv-tap-right { position: absolute; right: 0; top: 0; bottom: 0; width: 35%; z-index: 15; cursor: pointer; }
+        .sv-bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(transparent, rgba(0,0,0,0.7)); padding: 30px 16px 16px; display: flex; align-items: center; justify-content: space-between; }
+        .sv-views-count { color: rgba(255,255,255,0.85); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+        .sv-delete-btn { background: rgba(255,50,50,0.8); border: none; color: white; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
+
+        /* ===== نافذة اقتصاص الصورة الشخصية ===== */
+        #avatar-crop-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.96); z-index:8500; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+        #avatar-crop-canvas-wrap { position:relative; width:280px; height:280px; border-radius:50%; overflow:hidden; border:3px solid var(--accent); flex-shrink:0; touch-action:none; cursor:grab; background:#111; }
+        #avatar-crop-img { position:absolute; transform-origin: 0 0; user-select:none; -webkit-user-drag:none; max-width:none; }
+        .crop-hint { color:rgba(255,255,255,0.55); font-size:0.82rem; text-align:center; margin:10px 0 4px; }
+        .crop-zoom-row { display:flex; align-items:center; gap:12px; width:100%; max-width:300px; margin-top:6px; }
+        .crop-zoom-row label { color:rgba(255,255,255,0.6); font-size:0.82rem; white-space:nowrap; }
+        .crop-zoom-slider { flex:1; accent-color:var(--accent); }
 
         /* ===== قائمة المتابعين ===== */
         #follow-list-modal { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 5500; flex-direction: column; }
@@ -805,7 +817,7 @@
         <div style="font-size:2rem;text-align:center;margin-bottom:10px;">⚠️</div>
         <h3 style="color:#f1c40f;text-align:center;margin:0 0 10px;">يجب تفعيل صلاحيات جدول stories</h3>
         <p style="color:#8e99a2;font-size:0.85rem;text-align:center;margin-bottom:15px;">اذهب إلى <b style="color:white;">Supabase → SQL Editor</b> والصق هذا الكود:</p>
-        <div style="background:#0b1116;border:1px solid #24313d;border-radius:12px;padding:15px;font-family:monospace;font-size:0.75rem;color:#2ecc71;line-height:1.7;white-space:pre-wrap;overflow-x:auto;" id="rls-sql-block">-- 1) إنشاء الجدول إن لم يكن موجوداً
+        <div style="background:#0b1116;border:1px solid #24313d;border-radius:12px;padding:15px;font-family:monospace;font-size:0.75rem;color:#2ecc71;line-height:1.7;white-space:pre-wrap;overflow-x:auto;" id="rls-sql-block">-- 1) جدول الستوريات
 CREATE TABLE IF NOT EXISTS stories (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID,
@@ -816,9 +828,17 @@ CREATE TABLE IF NOT EXISTS stories (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '24 hours')
 );
+ALTER TABLE stories DISABLE ROW LEVEL SECURITY;
 
--- 2) تعطيل RLS (أسهل حل)
-ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
+-- 2) جدول المشاهدات
+CREATE TABLE IF NOT EXISTS story_views (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  story_id UUID,
+  viewer_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(story_id, viewer_id)
+);
+ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
         <button onclick="_copyRlsSql()" id="rls-copy-btn" style="width:100%;margin-top:14px;background:#1e90ff;color:white;border:none;padding:13px;border-radius:12px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:'Tajawal',sans-serif;">📋 نسخ الكود</button>
         <p style="color:#8e99a2;font-size:0.78rem;text-align:center;margin:10px 0 0;">بعد تشغيل الكود في Supabase، انشر الستوري مجدداً</p>
     </div>
@@ -826,7 +846,7 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
 
 <!-- عارض الستوري -->
 <div id="story-viewer-modal" style="display:none; position:fixed; inset:0; background:#000; z-index:7000; flex-direction:column;">
-    <div style="position:relative; flex:1;">
+    <div style="position:relative; flex:1; overflow:hidden;">
         <img id="sv-img" class="sv-img" src="" alt="">
         <div class="sv-progress-bar-container" id="sv-progress-container"></div>
         <div class="sv-header">
@@ -840,6 +860,27 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
         <div class="sv-text-layer" id="sv-text-layer"></div>
         <div class="sv-tap-left" onclick="svPrev()"></div>
         <div class="sv-tap-right" onclick="svNext()"></div>
+        <div class="sv-bottom-bar" id="sv-bottom-bar">
+            <div class="sv-views-count" id="sv-views-count"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
+            <button class="sv-delete-btn" id="sv-delete-btn" style="display:none;" onclick="deleteCurrentStory()">🗑️</button>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة اقتصاص الصورة الشخصية -->
+<div id="avatar-crop-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.96); z-index:8500; flex-direction:column; align-items:center; justify-content:center; padding:20px; gap:0;">
+    <h3 style="color:white;margin:0 0 12px;font-size:1rem;">اضبط موضع الصورة</h3>
+    <div id="avatar-crop-canvas-wrap">
+        <img id="avatar-crop-img" src="" alt="" draggable="false">
+    </div>
+    <p class="crop-hint">اسحب الصورة لضبط موضعها داخل الدائرة</p>
+    <div class="crop-zoom-row">
+        <label>🔍 التكبير</label>
+        <input type="range" class="crop-zoom-slider" id="crop-zoom-slider" min="0.5" max="3" step="0.01" value="1" oninput="_cropZoomChange(this.value)">
+    </div>
+    <div style="display:flex;gap:12px;margin-top:18px;width:100%;max-width:300px;">
+        <button onclick="_confirmAvatarCrop()" style="flex:1;background:var(--accent);color:white;border:none;padding:13px;border-radius:14px;font-size:1rem;font-weight:bold;font-family:'Tajawal',sans-serif;cursor:pointer;">✅ تأكيد</button>
+        <button onclick="document.getElementById('avatar-crop-modal').style.display='none'" style="flex:1;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);padding:13px;border-radius:14px;font-size:1rem;font-family:'Tajawal',sans-serif;cursor:pointer;">إلغاء</button>
     </div>
 </div>
 
@@ -870,6 +911,25 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
             };
             reader.onerror = () => reject(new Error('فشل قراءة الملف'));
             reader.readAsDataURL(file);
+        });
+    }
+
+    function _resizeBase64(dataUrl, maxSize, quality) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                let w = img.width, h = img.height;
+                if (w > maxSize || h > maxSize) {
+                    if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+                    else       { w = Math.round(w * maxSize / h); h = maxSize; }
+                }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = () => reject(new Error('resize failed'));
+            img.src = dataUrl;
         });
     }
 
@@ -1223,27 +1283,118 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
         }
     }
 
+    // ===== اقتصاص الصورة الشخصية =====
+    let _cropScale = 1, _cropOffX = 0, _cropOffY = 0;
+    let _cropImgNatW = 0, _cropImgNatH = 0;
+    let _cropDragging = false, _cropStartX = 0, _cropStartY = 0, _cropOrigX = 0, _cropOrigY = 0;
+    let _croppedDataUrl = null;
+
     function previewProfilePhoto(event) {
         const file = event.target.files[0];
         if (!file) return;
-        const statusEl = document.getElementById('photo-status');
-        if (statusEl) statusEl.innerText = '✅ تم اختيار الصورة، اضغط حفظ لرفعها';
         const reader = new FileReader();
         reader.onload = function(e) {
-            const preview = document.getElementById('edit-avatar-preview');
-            if (preview) {
-                if (preview.tagName === 'IMG') { preview.src = e.target.result; }
-                else {
-                    preview.style.backgroundImage = `url(${e.target.result})`;
-                    preview.style.backgroundSize = 'cover';
-                    preview.style.backgroundRepeat = 'no-repeat';
-                    preview.style.backgroundPosition = 'center';
-                    preview.style.borderRadius = '50%';
-                    preview.innerText = '';
-                }
-            }
+            // نفتح نافذة الاقتصاص بدل المعاينة المباشرة
+            _openAvatarCrop(e.target.result, file);
         };
         reader.readAsDataURL(file);
+    }
+
+    function _openAvatarCrop(dataUrl, file) {
+        const modal = document.getElementById('avatar-crop-modal');
+        const img = document.getElementById('avatar-crop-img');
+        const wrap = document.getElementById('avatar-crop-canvas-wrap');
+        const slider = document.getElementById('crop-zoom-slider');
+        _croppedDataUrl = null;
+        _cropScale = 1; _cropOffX = 0; _cropOffY = 0;
+        slider.value = 1;
+        img.onload = function() {
+            _cropImgNatW = img.naturalWidth; _cropImgNatH = img.naturalHeight;
+            // نحسب المقياس الأولي بحيث تملأ الصورة الدائرة
+            const minScale = Math.max(280 / _cropImgNatW, 280 / _cropImgNatH);
+            _cropScale = minScale;
+            slider.min = minScale * 0.8;
+            slider.max = minScale * 4;
+            slider.value = _cropScale;
+            _applyCropTransform();
+            _initCropDrag(wrap, img);
+        };
+        img.src = dataUrl;
+        modal.style.display = 'flex';
+        // نحفظ الملف الأصلي للرفع
+        window._pendingAvatarFile = file;
+    }
+
+    function _cropZoomChange(val) {
+        _cropScale = parseFloat(val);
+        _clampCropOffset();
+        _applyCropTransform();
+    }
+
+    function _applyCropTransform() {
+        const img = document.getElementById('avatar-crop-img');
+        img.style.width  = (_cropImgNatW * _cropScale) + 'px';
+        img.style.height = (_cropImgNatH * _cropScale) + 'px';
+        img.style.left   = _cropOffX + 'px';
+        img.style.top    = _cropOffY + 'px';
+    }
+
+    function _clampCropOffset() {
+        const scaledW = _cropImgNatW * _cropScale;
+        const scaledH = _cropImgNatH * _cropScale;
+        _cropOffX = Math.min(0, Math.max(280 - scaledW, _cropOffX));
+        _cropOffY = Math.min(0, Math.max(280 - scaledH, _cropOffY));
+    }
+
+    let _cropDragInited = false;
+    function _initCropDrag(wrap, img) {
+        if (_cropDragInited) return;
+        _cropDragInited = true;
+
+        const startDrag = (cx, cy) => { _cropDragging = true; _cropStartX = cx; _cropStartY = cy; _cropOrigX = _cropOffX; _cropOrigY = _cropOffY; wrap.style.cursor = 'grabbing'; };
+        const moveDrag = (cx, cy) => {
+            if (!_cropDragging) return;
+            _cropOffX = _cropOrigX + (cx - _cropStartX);
+            _cropOffY = _cropOrigY + (cy - _cropStartY);
+            _clampCropOffset();
+            _applyCropTransform();
+        };
+        const endDrag = () => { _cropDragging = false; wrap.style.cursor = 'grab'; };
+
+        wrap.addEventListener('mousedown',  e => { startDrag(e.clientX, e.clientY); e.preventDefault(); });
+        window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+        window.addEventListener('mouseup',   endDrag);
+        wrap.addEventListener('touchstart',  e => { startDrag(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); }, { passive: false });
+        window.addEventListener('touchmove', e => { if(_cropDragging) { moveDrag(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
+        window.addEventListener('touchend',  endDrag);
+    }
+
+    function _confirmAvatarCrop() {
+        const img = document.getElementById('avatar-crop-img');
+        const SIZE = 280;
+        const canvas = document.createElement('canvas');
+        canvas.width = SIZE; canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        // رسم دائرة اقتصاص
+        ctx.beginPath(); ctx.arc(SIZE/2, SIZE/2, SIZE/2, 0, Math.PI*2); ctx.clip();
+        ctx.drawImage(img, _cropOffX, _cropOffY, _cropImgNatW * _cropScale, _cropImgNatH * _cropScale);
+        _croppedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+
+        // معاينة الصورة المقصوصة في صفحة التعديل
+        const preview = document.getElementById('edit-avatar-preview');
+        if (preview) {
+            if (preview.tagName === 'IMG') {
+                preview.src = _croppedDataUrl;
+            } else {
+                preview.style.backgroundImage = `url(${_croppedDataUrl})`;
+                preview.style.backgroundSize = 'cover'; preview.style.backgroundRepeat = 'no-repeat';
+                preview.style.backgroundPosition = 'center'; preview.style.borderRadius = '50%';
+                preview.innerText = '';
+            }
+        }
+        const statusEl = document.getElementById('photo-status');
+        if (statusEl) statusEl.innerText = '✅ تم ضبط الصورة، اضغط حفظ للرفع';
+        document.getElementById('avatar-crop-modal').style.display = 'none';
     }
 
     async function saveProfile(event) {
@@ -1261,12 +1412,23 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
         const usernameToSave = (document.getElementById('profile-username-input') ? document.getElementById('profile-username-input').value || '' : '').trim().replace(/[^a-zA-Z0-9_\.]/g, '').toLowerCase();
         if (nameToSave) localStorage.setItem('profile_name_' + currentUser.id, nameToSave);
         if (usernameToSave) { localStorage.setItem('profile_username_' + currentUser.id, usernameToSave); currentUserUsername = usernameToSave; }
-        if (photoFile) {
+        // إذا تم الاقتصاص، نستخدم الصورة المقصوصة بدل الملف الأصلي
+        const croppedB64 = window._croppedDataUrl || null;
+        if (croppedB64) window._croppedDataUrl = null;
+
+        if (croppedB64 || photoFile) {
             try {
                 btn.innerText = "جاري ضغط الصورة...";
                 showStatus('جاري ضغط الصورة...');
-                const compressedBase64 = await compressImageToBase64(photoFile, 280, 0.72);
-                const base64Data = compressedBase64.split(',')[1];
+                let base64Data;
+                if (croppedB64) {
+                    // الصورة مقصوصة مسبقاً — نضغطها فقط
+                    const resized = await _resizeBase64(croppedB64, 400, 0.82);
+                    base64Data = resized.split(',')[1];
+                } else {
+                    const compressedBase64 = await compressImageToBase64(photoFile, 280, 0.72);
+                    base64Data = compressedBase64.split(',')[1];
+                }
                 btn.innerText = "جاري رفع الصورة...";
                 showStatus('جاري الرفع إلى ImgBB...');
                 const IMGBB_KEY = '638981d49378234d9e0c5a2547722af0';
@@ -2487,9 +2649,12 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
         updateStoryTextOverlay();
     }
 
+    let _storyTextX = 50, _storyTextY = 50; // موضع النص كنسبة مئوية
+
     function updateStoryTextOverlay() {
         const text = document.getElementById('story-text-inp')?.value || '';
         const overlay = document.getElementById('story-text-overlay-el');
+        const area = document.getElementById('story-preview-area');
         if (!overlay) return;
         if (text.trim()) {
             overlay.style.display = 'block';
@@ -2497,9 +2662,58 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
             overlay.style.fontFamily = _selectedStoryFont;
             overlay.style.color = _selectedStoryColor;
             overlay.style.fontWeight = _selectedStoryFont.includes('Cairo') ? '900' : 'bold';
+            overlay.style.position = 'absolute';
+            overlay.style.left = _storyTextX + '%';
+            overlay.style.top = _storyTextY + '%';
+            overlay.style.transform = 'translate(-50%, -50%)';
+            _initStoryTextDrag(overlay, area);
         } else {
             overlay.style.display = 'none';
         }
+    }
+
+    let _storyDragInited = false;
+    function _initStoryTextDrag(overlay, area) {
+        if (_storyDragInited) return;
+        _storyDragInited = true;
+        let dragging = false, startX, startY, origLeft, origTop;
+        const getPercent = (px, total) => Math.min(95, Math.max(5, (px / total) * 100));
+
+        overlay.addEventListener('mousedown', e => {
+            dragging = true; startX = e.clientX; startY = e.clientY;
+            const r = area.getBoundingClientRect();
+            origLeft = (_storyTextX / 100) * r.width;
+            origTop  = (_storyTextY / 100) * r.height;
+            e.preventDefault();
+        });
+        document.addEventListener('mousemove', e => {
+            if (!dragging) return;
+            const r = area.getBoundingClientRect();
+            _storyTextX = getPercent(origLeft + (e.clientX - startX), r.width);
+            _storyTextY = getPercent(origTop  + (e.clientY - startY), r.height);
+            overlay.style.left = _storyTextX + '%';
+            overlay.style.top  = _storyTextY + '%';
+        });
+        document.addEventListener('mouseup', () => { dragging = false; });
+
+        overlay.addEventListener('touchstart', e => {
+            dragging = true;
+            startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+            const r = area.getBoundingClientRect();
+            origLeft = (_storyTextX / 100) * r.width;
+            origTop  = (_storyTextY / 100) * r.height;
+            e.preventDefault();
+        }, { passive: false });
+        document.addEventListener('touchmove', e => {
+            if (!dragging) return;
+            const r = area.getBoundingClientRect();
+            _storyTextX = getPercent(origLeft + (e.touches[0].clientX - startX), r.width);
+            _storyTextY = getPercent(origTop  + (e.touches[0].clientY - startY), r.height);
+            overlay.style.left = _storyTextX + '%';
+            overlay.style.top  = _storyTextY + '%';
+            e.preventDefault();
+        }, { passive: false });
+        document.addEventListener('touchend', () => { dragging = false; });
     }
 
     function onStoryPhotoSelected(event) {
@@ -2525,11 +2739,14 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
         history.pushState({ modal: 'story-editor-modal' }, '');
         _storyPhotoFile = null;
         _storyPhotoDataUrl = null;
+        _storyTextX = 50; _storyTextY = 50; _storyDragInited = false;
         document.getElementById('story-preview-img').src = '';
         document.getElementById('story-preview-img').style.display = 'none';
         document.getElementById('story-bg-placeholder').style.display = 'flex';
         document.getElementById('story-text-inp').value = '';
-        document.getElementById('story-text-overlay-el').style.display = 'none';
+        const ovEl = document.getElementById('story-text-overlay-el');
+        ovEl.style.display = 'none';
+        ovEl.style.left = '50%'; ovEl.style.top = '50%';
         document.getElementById('story-photo-input').value = '';
         _selectedStoryFont = STORY_FONTS[0].family;
         _selectedStoryColor = '#ffffff';
@@ -2571,7 +2788,9 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
             btn.textContent = 'جاري الحفظ...';
 
             // حفظ في Supabase (جدول stories)
-            const textOverlay = document.getElementById('story-text-inp')?.value?.trim() || '';
+            const rawText = document.getElementById('story-text-inp')?.value?.trim() || '';
+            // نحفظ الموضع مع النص كـ JSON حتى يُعرض في الموضع الصحيح
+            const textOverlay = rawText ? JSON.stringify({ t: rawText, x: _storyTextX, y: _storyTextY }) : '';
             const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
             const { error: insertErr } = await _supabase.from('stories').insert([{
@@ -2792,12 +3011,19 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
         const timeDiff = Math.floor((new Date() - new Date(story.created_at)) / 60000);
         document.getElementById('sv-time').textContent = timeDiff < 1 ? 'الآن' : timeDiff < 60 ? `منذ ${timeDiff} دقيقة` : timeDiff < 1440 ? `منذ ${Math.floor(timeDiff/60)} ساعة` : 'منذ أمس';
 
-        // النص المتراكب
+        // النص المتراكب مع موضعه
         const textLayer = document.getElementById('sv-text-layer');
         if (story.text_overlay) {
-            textLayer.textContent = story.text_overlay;
+            let textStr = story.text_overlay, tx = 50, ty = 50;
+            try {
+                const parsed = JSON.parse(story.text_overlay);
+                if (parsed && parsed.t) { textStr = parsed.t; tx = parsed.x ?? 50; ty = parsed.y ?? 50; }
+            } catch(e) { /* نص عادي */ }
+            textLayer.textContent = textStr;
             textLayer.style.fontFamily = story.font_style || 'Tajawal, sans-serif';
             textLayer.style.color = story.text_color || '#ffffff';
+            textLayer.style.left = tx + '%';
+            textLayer.style.top = ty + '%';
             textLayer.style.display = 'block';
         } else {
             textLayer.style.display = 'none';
@@ -2817,11 +3043,53 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;</div>
             setTimeout(() => { fill.style.width = '100%'; }, 50);
         }
 
-        // علامة مشاهدة
-        const seenKey = `story_seen_${userId}_${story.id}`;
-        localStorage.setItem(seenKey, 'true');
+        // زر الحذف — يظهر فقط لصاحب الستوري
+        const delBtn = document.getElementById('sv-delete-btn');
+        if (delBtn) delBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
+
+        // تسجيل المشاهدة وجلب العدد
+        _recordAndShowStoryViews(story);
 
         _svTimer = setTimeout(() => svNext(), 5200);
+    }
+
+    async function _recordAndShowStoryViews(story) {
+        const seenKey = `sv_${story.id}`;
+        const viewsEl = document.getElementById('sv-views-num');
+        // تسجيل المشاهدة في localStorage
+        const alreadySeen = localStorage.getItem(seenKey);
+        localStorage.setItem(seenKey, '1');
+        // محاولة تسجيل في Supabase (story_views)
+        if (currentUser && !alreadySeen) {
+            try {
+                await _supabase.from('story_views').upsert(
+                    [{ story_id: story.id, viewer_id: currentUser.id }],
+                    { onConflict: 'story_id,viewer_id', ignoreDuplicates: true }
+                );
+            } catch(e) {}
+        }
+        // جلب عدد المشاهدات من Supabase
+        try {
+            const { count } = await _supabase.from('story_views')
+                .select('*', { count: 'exact', head: true })
+                .eq('story_id', story.id);
+            if (viewsEl && count !== null) viewsEl.textContent = count;
+        } catch(e) {
+            // إذا لم يكن الجدول موجوداً، نعرض 0
+            if (viewsEl) viewsEl.textContent = '0';
+        }
+    }
+
+    async function deleteCurrentStory() {
+        const userId = _svStories[_svUserIndex];
+        const userStories = (window._storiesData || {})[userId] || [];
+        const story = userStories[_svStoryIndex] || userStories[0];
+        if (!story || !currentUser || currentUser.id !== story.user_id) return;
+        if (!confirm('هل تريد حذف هذا الستوري نهائياً؟')) return;
+        const { error } = await _supabase.from('stories').delete().eq('id', story.id);
+        if (error) { alert('فشل الحذف: ' + error.message); return; }
+        closeStoryViewer();
+        loadStories();
     }
 
     function svNext() {
