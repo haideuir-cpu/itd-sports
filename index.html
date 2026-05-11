@@ -698,14 +698,33 @@
             grid-column: 1 / -1;
         }
 
-        /* --- بيانات المستخدم الاجتماعية --- */
+        /* --- علامة توثيق الحساب --- */
         .verified-badge {
             display: inline-flex; align-items: center; justify-content: center;
             width: 18px; height: 18px; border-radius: 50%;
-            background: var(--accent); margin-right: 4px; flex-shrink: 0;
-            vertical-align: middle;
+            background: #1d9bf0;
+            margin-right: 4px; flex-shrink: 0; vertical-align: middle;
+            box-shadow: 0 0 0 0 rgba(29,155,240,0.5);
+            animation: verifiedPulse 3s infinite;
+        }
+        .verified-badge.large {
+            width: 22px; height: 22px;
         }
         .verified-badge svg { width: 11px; height: 11px; fill: white; }
+        .verified-badge.large svg { width: 13px; height: 13px; }
+        @keyframes verifiedPulse {
+            0%   { box-shadow: 0 0 0 0 rgba(29,155,240,0.45); }
+            70%  { box-shadow: 0 0 0 6px rgba(29,155,240,0); }
+            100% { box-shadow: 0 0 0 0 rgba(29,155,240,0); }
+        }
+        .verified-pill {
+            display: inline-flex; align-items: center; gap: 5px;
+            background: rgba(29,155,240,0.12); border: 1px solid rgba(29,155,240,0.35);
+            border-radius: 20px; padding: 3px 10px 3px 6px;
+            font-size: 0.78rem; color: #1d9bf0; font-weight: bold; margin-top: 6px;
+        }
+        .verified-pill .verified-badge { margin-right: 0; width: 16px; height: 16px; animation: none; }
+        .verified-pill .verified-badge svg { width: 9px; height: 9px; }
 
         /* --- نافذة البحث عن المستخدمين --- */
         #search-modal {
@@ -1150,8 +1169,11 @@
         <div class="user-profile-name-row">
             <span class="user-profile-name" id="umod-name">---</span>
             <span id="umod-verified-badge" style="display:none;">
-                <span class="verified-badge"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
+                <span class="verified-badge large" title="حساب موثق"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>
             </span>
+        </div>
+        <div id="umod-verified-pill" style="display:none; padding: 0 20px 4px;">
+            <span class="verified-pill"><span class="verified-badge"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>حساب موثق</span>
         </div>
         <div class="user-profile-stats-row">
             <div class="user-stat-box">
@@ -1301,6 +1323,8 @@
         localStorage.setItem('theme', isLight ? 'light' : 'dark');
     }
 
+    let _verifiedRealtimeChannel = null;
+
     async function checkUserSession() {
         try {
             const { data, error } = await _supabase.auth.getSession();
@@ -1309,14 +1333,20 @@
             if (currentUser) {
                 await fetchUserPoints();
                 fetchNotifications();
+                _subscribeVerifiedRealtime(currentUser.id);
             }
             updateAuthUI();
 
             _supabase.auth.onAuthStateChange(async (_event, session) => {
                 currentUser = session?.user || null;
+                if (_verifiedRealtimeChannel) {
+                    _supabase.removeChannel(_verifiedRealtimeChannel);
+                    _verifiedRealtimeChannel = null;
+                }
                 if (currentUser) {
                     await fetchUserPoints();
                     fetchNotifications();
+                    _subscribeVerifiedRealtime(currentUser.id);
                 }
                 updateAuthUI();
                 if(document.getElementById('sec-n').classList.contains('active')) {
@@ -1326,6 +1356,45 @@
         } catch (err) {
             console.error(err);
         }
+    }
+
+    // مراقبة تغيير is_verified في الوقت الفعلي — تُفعَّل لحظة تعديلها من Supabase
+    function _subscribeVerifiedRealtime(userId) {
+        if (_verifiedRealtimeChannel) return;
+        _verifiedRealtimeChannel = _supabase
+            .channel('profile-verified-' + userId)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'profiles',
+                filter: `id=eq.${userId}`
+            }, payload => {
+                const newVal = payload.new && payload.new.is_verified;
+                const oldVal = payload.old && payload.old.is_verified;
+                if (newVal === true && !oldVal) {
+                    // تم التوثيق لأول مرة — نُحدَّث الواجهة ونُرسل إشعاراً
+                    currentUserIsVerified = true;
+                    localStorage.setItem('is_verified_' + userId, 'true');
+                    updateAuthUI();
+                    // إشعار داخل التطبيق
+                    const dot = document.getElementById('notif-dot');
+                    if (dot) dot.style.display = 'block';
+                    setTimeout(() => {
+                        alert('🎉 تهانينا! تم توثيق حسابك بنجاح. ستظهر علامة التوثيق ✓ بجانب اسمك في كل مكان.');
+                    }, 500);
+                } else if (newVal === false && oldVal === true) {
+                    currentUserIsVerified = false;
+                    localStorage.removeItem('is_verified_' + userId);
+                    updateAuthUI();
+                }
+                // تحديث باقي البيانات
+                if (payload.new) {
+                    currentUserFollowers = payload.new.followers_count || currentUserFollowers;
+                    currentUserFollowing = payload.new.following_count || currentUserFollowing;
+                    currentUserUsername = payload.new.username || currentUserUsername;
+                }
+            })
+            .subscribe();
     }
 
     let currentUserIsVerified = false;
@@ -1509,17 +1578,25 @@
                     </div>
                 `;
             } else {
-                const verifiedHtml = currentUserIsVerified ? `<span class="verified-badge" style="display:inline-flex;width:20px;height:20px;"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>` : '';
+                const verifiedHtml = currentUserIsVerified
+                    ? `<span class="verified-badge large" title="حساب موثق"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>`
+                    : '';
+                const verifiedPillHtml = currentUserIsVerified
+                    ? `<span class="verified-pill"><span class="verified-badge"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>حساب موثق</span>`
+                    : '';
                 const usernameHtml = savedUsername ? `<div style="color:var(--nav-inactive);font-size:0.82rem;margin-bottom:4px;direction:ltr;text-align:right;">@${savedUsername}</div>` : '';
                 accountContainer.innerHTML = `
-                    <div style="background: var(--card); border-radius: 25px; overflow:hidden; margin-bottom: 20px; border: 1px solid var(--border);">
-                        <div style="height:80px; background:linear-gradient(135deg,#0d1b35,#162029);"></div>
+                    <div style="background: var(--card); border-radius: 25px; overflow:hidden; margin-bottom: 20px; border: 1px solid ${currentUserIsVerified ? 'rgba(29,155,240,0.35)' : 'var(--border)'}; ${currentUserIsVerified ? 'box-shadow: 0 0 0 1px rgba(29,155,240,0.15);' : ''}">
+                        <div style="height:80px; background:linear-gradient(135deg,#0d1b35,${currentUserIsVerified ? '#0a2a4a' : '#162029'});"></div>
                         <div style="padding: 0 20px 20px; margin-top:-42px;">
                             <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:12px;">
-                                ${savedPhoto
-                                    ? `<img src="${savedPhoto}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid var(--card);flex-shrink:0;${frameCSS}">`
-                                    : `<div class="v-comment-avatar-text" style="width:80px;height:80px;font-size:2rem;border:4px solid var(--card);${frameCSS}">${userInitials}</div>`
-                                }
+                                <div style="position:relative;">
+                                    ${savedPhoto
+                                        ? `<img src="${savedPhoto}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:4px solid var(--card);flex-shrink:0;${frameCSS}">`
+                                        : `<div class="v-comment-avatar-text" style="width:80px;height:80px;font-size:2rem;border:4px solid var(--card);${frameCSS}">${userInitials}</div>`
+                                    }
+                                    ${currentUserIsVerified ? `<span class="verified-badge" style="position:absolute;bottom:2px;right:2px;margin:0;border:2px solid var(--card);width:22px;height:22px;"><svg viewBox="0 0 24 24" style="width:12px;height:12px;"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>` : ''}
+                                </div>
                                 <div style="display:flex;gap:8px;padding-bottom:4px;">
                                     <div style="text-align:center;min-width:52px;">
                                         <b style="display:block;font-size:1.1rem;">${currentUserFollowers}</b>
@@ -1536,7 +1613,8 @@
                                 ${verifiedHtml}
                             </div>
                             ${usernameHtml}
-                            <div style="color:#8e99a2;font-size:0.78rem;margin-bottom:12px;">${currentUser.email}</div>
+                            ${verifiedPillHtml}
+                            <div style="color:#8e99a2;font-size:0.78rem;margin-bottom:12px;margin-top:${currentUserIsVerified ? '8px' : '0'};">${currentUser.email}</div>
                             <span style="background: rgba(241, 196, 15, 0.15); border: 1px solid var(--gold); padding: 4px 12px; border-radius: 20px; color: var(--gold); font-weight: bold; font-size: 0.88rem;">⭐ ${currentUserPoints} نقطة</span>
                         </div>
                     </div>
@@ -2460,7 +2538,7 @@
         if(box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
     }
 
-    async function sendReply(e, parentId) {
+    async function sendReply(e, parentId, authorId) {
         if(e) e.stopPropagation();
         if (!currentUser) { openAuthModal(); return; }
         const input = document.getElementById('reply-input-' + parentId);
@@ -2480,6 +2558,11 @@
                 if(error.message.includes('parent_id')) alert('لتعمل ميزة الردود، يرجى التأكد من إضافة عمود parent_id.');
                 else alert('حدث خطأ أثناء إرسال الرد.');
                 return;
+            }
+
+            // إشعار صاحب التعليق الأصلي عند الرد عليه (ما عدا إذا رد على نفسه)
+            if (authorId && authorId !== currentUser.id) {
+                sendNotif(authorId, '💬 رد على تعليقك', `ردّ ${userName} على تعليقك: "${text.substring(0, 40)}${text.length > 40 ? '...' : ''}"`);
             }
 
             input.value = '';
@@ -2505,7 +2588,7 @@
         } catch (e) { alert('حدث خطأ أثناء الإرسال.'); }
     }
 
-    async function toggleCommentLike(e, commentId, btn, type) {
+    async function toggleCommentLike(e, commentId, btn, type, authorId) {
         if (e) e.stopPropagation(); 
         if (!currentUser) { openAuthModal(); return; }
 
@@ -2526,6 +2609,12 @@
             if(type === 'likes') btn.classList.add('active-like');
             else btn.classList.add('active-dislike');
             localStorage.setItem(storageKey, 'true');
+
+            // إشعار صاحب التعليق عند الإعجاب فقط (ليس الضغط مرة ثانية للإلغاء، وليس لنفسك)
+            if (type === 'likes' && authorId && authorId !== currentUser.id) {
+                const myName = localStorage.getItem('profile_name_' + currentUser.id) || currentUser.email.split('@')[0];
+                sendNotif(authorId, '👍 إعجاب بتعليقك', `أعجب ${myName} بتعليقك`);
+            }
         }
 
         span.textContent = newVal;
@@ -3329,8 +3418,9 @@
     async function quickFollow(userId, btn) {
         if (!currentUser) { openAuthModal(); return; }
         const isNowFollowing = _followingSet.has(userId);
+        const myName = localStorage.getItem('profile_name_' + currentUser.id) || currentUser.email.split('@')[0];
+
         if (isNowFollowing) {
-            // إلغاء المتابعة
             await _supabase.from('follows').delete()
                 .eq('follower_id', currentUser.id)
                 .eq('following_id', userId);
@@ -3338,13 +3428,13 @@
             btn.textContent = 'متابعة';
             btn.classList.remove('following');
         } else {
-            // متابعة
             await _supabase.from('follows').insert([{ follower_id: currentUser.id, following_id: userId }]);
             _followingSet.add(userId);
             btn.textContent = 'متابَع ✓';
             btn.classList.add('following');
+            // إشعار المستخدم المتابَع من نتائج البحث
+            sendNotif(userId, '👤 متابع جديد', `بدأ ${myName} بمتابعتك`);
         }
-        // تحديث عدادات المتابعة في قاعدة البيانات إذا توفرت الدوال
         try {
             if (!isNowFollowing) {
                 await _supabase.rpc('increment_followers', { user_id: userId });
@@ -3354,6 +3444,19 @@
                 await _supabase.rpc('decrement_following', { user_id: currentUser.id });
             }
         } catch(e) {}
+    }
+
+    // ---- دالة مساعدة لإرسال الإشعارات ----
+    async function sendNotif(targetUserId, title, message) {
+        if (!targetUserId || !currentUser) return;
+        try {
+            await _supabase.from('notifications').insert([{
+                user_id: targetUserId,
+                title: title,
+                message: message,
+                is_read: false
+            }]);
+        } catch(e) { /* الإشعار اختياري، نتجاهل الأخطاء */ }
     }
 
     async function openUserProfile(userId) {
@@ -3401,6 +3504,10 @@
 
             if (u.is_verified) {
                 document.getElementById('umod-verified-badge').style.display = 'inline';
+                document.getElementById('umod-verified-pill').style.display = 'block';
+            } else {
+                document.getElementById('umod-verified-badge').style.display = 'none';
+                document.getElementById('umod-verified-pill').style.display = 'none';
             }
 
             // زر المتابعة
@@ -3427,6 +3534,7 @@
         if (!_viewingUserId) return;
         const btn = document.getElementById('umod-follow-btn');
         const isFollowing = _followingSet.has(_viewingUserId);
+        const myName = localStorage.getItem('profile_name_' + currentUser.id) || currentUser.email.split('@')[0];
 
         if (isFollowing) {
             await _supabase.from('follows').delete()
@@ -3444,6 +3552,8 @@
             btn.classList.add('following');
             const el = document.getElementById('umod-followers');
             if (el) el.textContent = parseInt(el.textContent) + 1;
+            // إشعار المستخدم المتابَع
+            sendNotif(_viewingUserId, '👤 متابع جديد', `بدأ ${myName} بمتابعتك`);
         }
 
         try {
