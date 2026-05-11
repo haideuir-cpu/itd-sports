@@ -1331,6 +1331,7 @@
     let currentUserIsVerified = false;
     let currentUserFollowers = 0;
     let currentUserFollowing = 0;
+    let currentUserUsername = '';
 
     async function fetchUserPoints() {
         if(!currentUser) return;
@@ -1341,8 +1342,12 @@
                 currentUserIsVerified = data.is_verified || false;
                 currentUserFollowers = data.followers_count || 0;
                 currentUserFollowing = data.following_count || 0;
+                currentUserUsername = data.username || '';
                 if(data.full_name) {
                     localStorage.setItem('profile_name_' + currentUser.id, data.full_name);
+                }
+                if(data.username) {
+                    localStorage.setItem('profile_username_' + currentUser.id, data.username);
                 }
                 if(data.has_golden_frame === true) {
                     localStorage.setItem('has_golden_frame_' + currentUser.id, 'true');
@@ -1477,6 +1482,8 @@
                 ? `<img id="edit-avatar-preview" src="${savedPhoto}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;${frameCSS}">`
                 : `<div id="edit-avatar-preview" class="v-comment-avatar-text" style="width:80px;height:80px;font-size:2rem;cursor:pointer;${frameCSS}">${userInitials}</div>`;
 
+            const savedUsername = localStorage.getItem('profile_username_' + currentUser.id) || currentUserUsername || '';
+
             if (isProfileEditMode) {
                 accountContainer.innerHTML = `
                     <div style="background: var(--card); padding: 25px 20px; border-radius: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; align-items: center;">
@@ -1489,7 +1496,12 @@
                         <input type="file" id="profile-photo-input" accept="image/*" style="display:none;" onchange="previewProfilePhoto(event)">
                         <small id="photo-status" style="color:var(--nav-inactive);font-size:0.8rem;margin-top:-10px;">اضغط على الصورة لتغييرها</small>
                         <h4 style="margin: 0; color: var(--accent);">تعديل الملف الشخصي</h4>
-                        <input type="text" id="profile-name-input" placeholder="أدخل اسمك" class="auth-input" value="${savedName}" style="margin-top: 5px; text-align: center; font-weight: bold; border-color: var(--border);">
+                        <input type="text" id="profile-name-input" placeholder="أدخل اسمك الكامل" class="auth-input" value="${savedName}" style="margin-top: 5px; text-align: center; font-weight: bold; border-color: var(--border);">
+                        <div style="position:relative; width:100%;">
+                            <span style="position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--nav-inactive); font-size:1.1rem; pointer-events:none;">@</span>
+                            <input type="text" id="profile-username-input" placeholder="اسم المستخدم (بالإنجليزية)" class="auth-input" value="${savedUsername}" style="text-align: right; padding-right: 36px; border-color: var(--border); direction:ltr; text-align:left;">
+                        </div>
+                        <small style="color:var(--nav-inactive);font-size:0.78rem;margin-top:-8px;width:100%;">يُستخدم للبحث — بدون مسافات أو رموز خاصة</small>
                         <div style="display: flex; gap: 10px; width: 100%; margin-top: 10px;">
                             <button onclick="saveProfile(event)" style="flex: 1; background: #2ecc71; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 1rem;">حفظ</button>
                             <button onclick="toggleProfileEditMode()" style="flex: 1; background: transparent; color: var(--nav-inactive); border: 1px solid var(--border); padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 1rem;">إلغاء</button>
@@ -1498,6 +1510,7 @@
                 `;
             } else {
                 const verifiedHtml = currentUserIsVerified ? `<span class="verified-badge" style="display:inline-flex;width:20px;height:20px;"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>` : '';
+                const usernameHtml = savedUsername ? `<div style="color:var(--nav-inactive);font-size:0.82rem;margin-bottom:4px;direction:ltr;text-align:right;">@${savedUsername}</div>` : '';
                 accountContainer.innerHTML = `
                     <div style="background: var(--card); border-radius: 25px; overflow:hidden; margin-bottom: 20px; border: 1px solid var(--border);">
                         <div style="height:80px; background:linear-gradient(135deg,#0d1b35,#162029);"></div>
@@ -1518,11 +1531,12 @@
                                     </div>
                                 </div>
                             </div>
-                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
                                 <span style="color: #00d2b5; font-size: 1.2rem; font-weight: bold;">${savedName}</span>
                                 ${verifiedHtml}
                             </div>
-                            <div style="color:#8e99a2;font-size:0.82rem;margin-bottom:12px;">${currentUser.email}</div>
+                            ${usernameHtml}
+                            <div style="color:#8e99a2;font-size:0.78rem;margin-bottom:12px;">${currentUser.email}</div>
                             <span style="background: rgba(241, 196, 15, 0.15); border: 1px solid var(--gold); padding: 4px 12px; border-radius: 20px; color: var(--gold); font-weight: bold; font-size: 0.88rem;">⭐ ${currentUserPoints} نقطة</span>
                         </div>
                     </div>
@@ -1600,7 +1614,9 @@
         const showErr = (msg) => { showStatus('❌ ' + msg, '#ff4d4d'); btn.innerText = originalText; btn.disabled = false; };
 
         const nameToSave = (document.getElementById('profile-name-input').value || '').trim();
+        const usernameToSave = (document.getElementById('profile-username-input') ? document.getElementById('profile-username-input').value || '' : '').trim().replace(/[^a-zA-Z0-9_\.]/g, '').toLowerCase();
         if (nameToSave) localStorage.setItem('profile_name_' + currentUser.id, nameToSave);
+        if (usernameToSave) { localStorage.setItem('profile_username_' + currentUser.id, usernameToSave); currentUserUsername = usernameToSave; }
 
         if (photoFile) {
             try {
@@ -1656,6 +1672,7 @@
                 if (attempt > 1) showStatus(`إعادة محاولة الحفظ (${attempt}/3)...`);
                 const upsertData = { id: currentUser.id };
                 if (nameToSave) upsertData.full_name = nameToSave;
+                if (usernameToSave) upsertData.username = usernameToSave;
                 if (newPhotoUrl) upsertData.avatars_url = newPhotoUrl;
                 const savePromise = _supabase.from('profiles').upsert(upsertData);
                 const { error: dbError } = await Promise.race([
@@ -3270,10 +3287,11 @@
     async function _doSearch(q) {
         const container = document.getElementById('search-results');
         try {
+            // البحث بالاسم الكامل أو اسم المستخدم في نفس الوقت
             const { data, error } = await _supabase
                 .from('profiles')
-                .select('id, full_name, avatars_url, profile_image, points, is_verified, followers_count')
-                .ilike('full_name', `%${q}%`)
+                .select('id, full_name, username, avatars_url, profile_image, points, is_verified, followers_count')
+                .or(`full_name.ilike.%${q}%,username.ilike.%${q}%`)
                 .limit(30);
 
             if (error || !data || data.length === 0) {
@@ -3291,13 +3309,14 @@
                 const isOwnProfile = currentUser && u.id === currentUser.id;
                 const isFollowing = _followingSet.has(u.id);
                 const followBtnHtml = isOwnProfile ? '' : `<button class="search-follow-btn ${isFollowing ? 'following' : ''}" id="sfb-${u.id}" onclick="event.stopPropagation(); quickFollow('${u.id}', this)">${isFollowing ? 'متابَع ✓' : 'متابعة'}</button>`;
+                const usernameRow = u.username ? `<div class="search-result-meta" style="direction:ltr;text-align:right;">@${u.username} · ${u.followers_count || 0} متابع</div>` : `<div class="search-result-meta">${u.followers_count || 0} متابع · ⭐ ${u.points || 0} نقطة</div>`;
 
                 return `
                 <div class="search-result-item" onclick="openUserProfile('${u.id}')">
                     ${avHtml}
                     <div class="search-result-info">
                         <div class="search-result-name">${u.full_name || 'مستخدم'}${verifiedBadge}</div>
-                        <div class="search-result-meta">${u.followers_count || 0} متابع · ⭐ ${u.points || 0} نقطة</div>
+                        ${usernameRow}
                     </div>
                     ${followBtnHtml}
                 </div>`;
@@ -3361,7 +3380,7 @@
         try {
             const { data: u } = await _supabase
                 .from('profiles')
-                .select('id, full_name, avatars_url, profile_image, points, is_verified, followers_count, following_count')
+                .select('id, full_name, username, avatars_url, profile_image, points, is_verified, followers_count, following_count')
                 .eq('id', userId)
                 .maybeSingle();
 
@@ -3378,7 +3397,7 @@
             document.getElementById('umod-following').textContent = u.following_count || 0;
             document.getElementById('umod-points').textContent = u.points || 0;
             document.getElementById('umod-pts-val').textContent = u.points || 0;
-            document.getElementById('umod-email-label').textContent = '';
+            document.getElementById('umod-email-label').textContent = u.username ? '@' + u.username : '';
 
             if (u.is_verified) {
                 document.getElementById('umod-verified-badge').style.display = 'inline';
@@ -3523,9 +3542,20 @@
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js")
-      .then(reg => console.log("SW registered:", reg.scope))
-      .catch(err => console.log("SW error:", err));
+    navigator.serviceWorker.register("./sw.js").then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
+    }).catch(err => console.log("SW error:", err));
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
+    });
   });
 }
 
