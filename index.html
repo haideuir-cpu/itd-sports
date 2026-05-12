@@ -833,7 +833,7 @@ ALTER TABLE stories DISABLE ROW LEVEL SECURITY;
 -- 2) جدول المشاهدات
 CREATE TABLE IF NOT EXISTS story_views (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  story_id UUID,
+  story_id UUID REFERENCES stories(id) ON DELETE CASCADE,
   viewer_id UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(story_id, viewer_id)
@@ -861,10 +861,22 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
         <div class="sv-tap-left" onclick="svPrev()"></div>
         <div class="sv-tap-right" onclick="svNext()"></div>
         <div class="sv-bottom-bar" id="sv-bottom-bar">
-            <div class="sv-views-count" id="sv-views-count"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
+            <div class="sv-views-count" id="sv-views-count" style="cursor:pointer;display:none;" onclick="openStoryViewersList()"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
             <button class="sv-delete-btn" id="sv-delete-btn" style="display:none;" onclick="deleteCurrentStory()">🗑️</button>
         </div>
     </div>
+</div>
+
+<!-- نافذة المشاهدين للستوري -->
+<div id="story-viewers-modal" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:7100; flex-direction:column;">
+    <div style="padding:15px; background:var(--card); display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); flex-shrink:0;">
+        <div class="back-btn" onclick="closeModal('story-viewers-modal')">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </div>
+        <b id="story-viewers-title">المشاهدون</b>
+        <div style="width:40px;"></div>
+    </div>
+    <div id="story-viewers-list" style="flex:1; overflow-y:auto;"></div>
 </div>
 
 <!-- نافذة اقتصاص الصورة الشخصية -->
@@ -3043,9 +3055,11 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
             setTimeout(() => { fill.style.width = '100%'; }, 50);
         }
 
-        // زر الحذف — يظهر فقط لصاحب الستوري
+        // زر الحذف والمشاهدات — يظهران فقط لصاحب الستوري
         const delBtn = document.getElementById('sv-delete-btn');
+        const viewsCount = document.getElementById('sv-views-count');
         if (delBtn) delBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
+        if (viewsCount) viewsCount.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
 
         // تسجيل المشاهدة وجلب العدد
         _recordAndShowStoryViews(story);
@@ -3059,24 +3073,145 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
         // تسجيل المشاهدة في localStorage
         const alreadySeen = localStorage.getItem(seenKey);
         localStorage.setItem(seenKey, '1');
+
         // محاولة تسجيل في Supabase (story_views)
         if (currentUser && !alreadySeen) {
             try {
-                await _supabase.from('story_views').upsert(
+                const { error } = await _supabase.from('story_views').upsert(
                     [{ story_id: story.id, viewer_id: currentUser.id }],
                     { onConflict: 'story_id,viewer_id', ignoreDuplicates: true }
                 );
-            } catch(e) {}
+                if (error) {
+                    console.log('Story views error:', error.message);
+                    // إذا كان الجدول غير موجود، نحاول إنشاؤه
+                    if (error.message.includes('does not exist') || error.code === '42P01') {
+                        _showStoryViewsSetupError();
+                    }
+                }
+            } catch(e) {
+                console.log('Story views insert failed:', e.message);
+            }
         }
+
         // جلب عدد المشاهدات من Supabase
         try {
-            const { count } = await _supabase.from('story_views')
+            const { count, error } = await _supabase.from('story_views')
                 .select('*', { count: 'exact', head: true })
                 .eq('story_id', story.id);
-            if (viewsEl && count !== null) viewsEl.textContent = count;
+
+            if (error) {
+                console.log('Story views count error:', error.message);
+                if (error.message.includes('does not exist') || error.code === '42P01') {
+                    if (viewsEl) viewsEl.textContent = '0';
+                    _showStoryViewsSetupError();
+                } else {
+                    if (viewsEl) viewsEl.textContent = '0';
+                }
+            } else {
+                if (viewsEl && count !== null) viewsEl.textContent = count;
+            }
         } catch(e) {
-            // إذا لم يكن الجدول موجوداً، نعرض 0
+            console.log('Story views count failed:', e.message);
             if (viewsEl) viewsEl.textContent = '0';
+        }
+
+        // تخزين معرف الستوري الحالي لاستخدامه في عرض المشاهدين
+        window._currentStoryViewing = story;
+    }
+
+    function _showStoryViewsSetupError() {
+        // إظهار رسالة لصاحب الستوري فقط
+        if (currentUser && window._currentStoryViewing && currentUser.id === window._currentStoryViewing.user_id) {
+            const toast = document.createElement('div');
+            toast.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:#ff6b35;color:white;padding:12px 20px;border-radius:25px;font-weight:bold;font-size:0.9rem;z-index:9999;max-width:300px;text-align:center;animation:slideIn 0.3s ease-out;';
+            toast.textContent = '⚠️ تحتاج إعداد جدول المشاهدات. اذهب إلى Supabase → SQL Editor والصق الكود من نافذة الإصلاح';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+    }
+
+    async function openStoryViewersList() {
+        if (!window._currentStoryViewing) return;
+        const story = window._currentStoryViewing;
+        const modal = document.getElementById('story-viewers-modal');
+        const list = document.getElementById('story-viewers-list');
+
+        modal.style.display = 'flex';
+        history.pushState({ modal: 'story-viewers-modal' }, '');
+
+        list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--nav-inactive);">جاري التحميل...</div>';
+
+        try {
+            // جلب قائمة المشاهدين من جدول story_views
+            const { data: views, error } = await _supabase
+                .from('story_views')
+                .select('viewer_id, created_at')
+                .eq('story_id', story.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.log('Story viewers error:', error.message);
+                if (error.message.includes('does not exist') || error.code === '42P01') {
+                    list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">❌ جدول المشاهدات غير موجود<br><br>اذهب إلى Supabase → SQL Editor والصق الكود من نافذة الإصلاح لإنشاء الجدول</div>';
+                } else {
+                    list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">حدث خطأ في تحميل المشاهدين</div>';
+                }
+                return;
+            }
+
+            if (!views || views.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:60px;color:var(--nav-inactive);">لا يوجد مشاهدون بعد</div>';
+                return;
+            }
+
+            // جلب بيانات المستخدمين المشاهدين
+            const viewerIds = views.map(v => v.viewer_id);
+            const { data: profiles, error: profError } = await _supabase
+                .from('profiles')
+                .select('id, full_name, username, avatars_url, profile_image')
+                .in('id', viewerIds);
+
+            if (profError) {
+                console.log('Profiles error:', profError.message);
+                list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">حدث خطأ في تحميل بيانات المشاهدين</div>';
+                return;
+            }
+
+            const profileMap = {};
+            (profiles || []).forEach(p => profileMap[p.id] = p);
+
+            // بناء قائمة المشاهدين
+            list.innerHTML = views.map(v => {
+                const prof = profileMap[v.viewer_id];
+                if (!prof) return '';
+
+                const initials = (prof.full_name || '؟').substring(0, 2);
+                const avatarUrl = prof.avatars_url || prof.profile_image;
+                const avHtml = avatarUrl
+                    ? `<img style="width:50px;height:50px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border);" src="${avatarUrl}" onerror="this.outerHTML='<div style=width:50px;height:50px;border-radius:50%;background:var(--card);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:bold;color:var(--text);font-size:1rem;>${initials}</div>'" alt="">`
+                    : `<div style="width:50px;height:50px;border-radius:50%;background:var(--card);border:1px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-weight:bold;color:var(--text);font-size:1rem;">${initials}</div>`;
+
+                const timeDiff = Math.floor((new Date() - new Date(v.created_at)) / 60000);
+                let timeStr = 'الآن';
+                if(timeDiff > 86400) timeStr = `منذ ${Math.floor(timeDiff/86400)} أيام`;
+                else if(timeDiff > 3600) timeStr = `منذ ${Math.floor(timeDiff/3600)} ساعة`;
+                else if(timeDiff > 60) timeStr = `منذ ${Math.floor(timeDiff/60)} دقيقة`;
+
+                return `
+                    <div style="display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="closeModal('story-viewers-modal'); openUserProfile('${prof.id}'); event.stopPropagation();">
+                        ${avHtml}
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;font-size:0.95rem;color:var(--text);">${prof.full_name || 'مستخدم'}</div>
+                            <div style="color:var(--nav-inactive);font-size:0.8rem;margin-top:2px;">${prof.username ? '@' + prof.username + ' · ' : ''}${timeStr}</div>
+                        </div>
+                        <div style="color:var(--nav-inactive);font-size:0.75rem;">👁️ شاهد</div>
+                    </div>
+                `;
+            }).join('');
+
+        } catch(e) {
+            console.log('Story viewers load failed:', e.message);
+            list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">حدث خطأ أثناء تحميل المشاهدين</div>';
         }
     }
 
@@ -3137,7 +3272,7 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
 
     window.addEventListener('popstate', function(e) {
         const targetModal = e.state && e.state.modal;
-        const modals = ['p-modal', 's-modal', 'auth-modal', 'gift-modal', 'notif-modal', 'm-modal', 'search-modal', 'user-modal', 'follow-list-modal', 'story-editor-modal', 'story-viewer-modal'];
+        const modals = ['p-modal', 's-modal', 'auth-modal', 'gift-modal', 'notif-modal', 'm-modal', 'search-modal', 'user-modal', 'follow-list-modal', 'story-editor-modal', 'story-viewer-modal', 'story-viewers-modal'];
         for (const id of modals) {
             if (id === targetModal) continue;
             const el = document.getElementById(id);
