@@ -438,49 +438,7 @@
         .follow-item-name { font-weight: bold; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; }
         .follow-item-meta { color: var(--nav-inactive); font-size: 0.8rem; margin-top: 2px; }
         .follow-list-empty { text-align: center; padding: 60px 20px; color: var(--nav-inactive); font-size: 1rem; }
-    
-.story-circle {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 75px;
-    cursor: pointer;
-}
-.story-avatar-ring {
-    position: relative; /* هذا هو السطر الأهم لضمان بقاء الزائد داخل الدائرة */
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    padding: 2px;
-    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 5px;
-}
-.story-avatar-ring.own-add {
-    background: #2c3e50; /* لون مختلف لتمييز الإضافة */
-}
-.story-add-plus {
-    position: absolute;
-    bottom: 2px;
-    right: 2px;
-    background: #0095f6;
-    color: white;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 2px solid #0b1116; /* لون خلفية التطبيق */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: bold;
-    z-index: 2;
-}
-
-</style>
+    </style>
 </head>
 <body>
 <div id="install-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#0b1116,#162029);padding:12px 16px;border-bottom:1px solid #24313d;align-items:center;justify-content:space-between;gap:10px;">
@@ -2494,7 +2452,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
 
     async function loadNews() {
         // تحميل الستوريات أولاً
-        loadStories();
+        loadStories(); updateNotificationBadge();
         const newsListEl = document.getElementById('news-list');
         newsListEl.innerHTML = Array(3).fill(0).map(() => `<div style="background:var(--card); margin-bottom:15px; border-radius:12px; overflow:hidden; border: 1px solid var(--border);"><div class="skeleton-rect" style="width:100%;height:200px;border-radius:0;"></div><div style="padding:15px;"><div class="skeleton-line" style="width:80%;"></div><div class="skeleton-line" style="width:50%;height:10px;"></div></div></div>`).join('');
         const { data } = await _supabase.from('news').select('*').order('created_at', {ascending: false});
@@ -2965,7 +2923,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                 }
             } else {
                 closeStoryEditor();
-                loadStories();
+                loadStories(); updateNotificationBadge();
                 _showStorySuccessToast();
             }
         } catch(err) {
@@ -3005,7 +2963,103 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
 
     // تحميل شريط الستوري
     
-    async function loadStories() {
+    // دالة لجلب عدد الإشعارات غير المقروءة
+    async function updateNotificationBadge() {
+        if (!currentUser) return;
+        try {
+            const { count, error } = await _supabase
+                .from('notifications')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', currentUser.id)
+                .eq('is_read', false);
+
+            const badge = document.getElementById('notif-badge'); // تأكد من وجود هذا الـ ID في الـ HTML
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count > 9 ? '+9' : count;
+                    badge.style.display = 'flex';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        } catch (e) {
+            console.log('Error updating badge:', e.message);
+        }
+    }
+
+    // دالة لفتح قائمة الإشعارات وعرضها
+    async function openNotifications() {
+        if (!currentUser) { openAuthModal(); return; }
+        const modal = document.getElementById('notifications-modal');
+        const list = document.getElementById('notifications-list');
+        if (!modal || !list) return;
+
+        modal.style.display = 'flex';
+        history.pushState({ modal: 'notifications-modal' }, '');
+        list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--nav-inactive);">جاري تحميل الإشعارات...</div>';
+
+        try {
+            const { data, error } = await _supabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false })
+                .limit(30);
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                list.innerHTML = '<div style="text-align:center;padding:50px;color:var(--nav-inactive);"><i class="ph ph-bell-slash" style="font-size:2rem;display:block;margin-bottom:10px;"></i>لا توجد إشعارات حالياً</div>';
+                return;
+            }
+
+            list.innerHTML = data.map(n => {
+                const timeStr = _getRelativeTime(n.created_at);
+                const dot = !n.is_read ? '<div style="width:8px;height:8px;background:var(--accent);border-radius:50%;"></div>' : '';
+                return `
+                    <div class="notif-item ${n.is_read ? '' : 'unread'}" style="display:flex;align-items:center;gap:12px;padding:15px;border-bottom:1px solid var(--border);cursor:pointer;background:${n.is_read ? 'transparent' : 'rgba(30,144,255,0.05)'};" onclick="markNotifRead('${n.id}');">
+                        <div style="width:45px;height:45px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <i class="${_getNotifIcon(n.type)}" style="font-size:1.4rem;color:var(--accent);"></i>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="font-weight:bold;font-size:0.9rem;color:var(--text);">${n.title}</div>
+                            <div style="font-size:0.85rem;color:var(--nav-inactive);margin-top:3px;">${n.content}</div>
+                            <div style="font-size:0.75rem;color:var(--nav-inactive);margin-top:5px;">${timeStr}</div>
+                        </div>
+                        ${dot}
+                    </div>
+                `;
+            }).join('');
+
+            // تحديث الإشعارات كمقروءة في قاعدة البيانات
+            await _supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id);
+            setTimeout(updateNotificationBadge, 2000);
+
+        } catch (e) {
+            list.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4d4d;">خطأ في تحميل الإشعارات</div>';
+        }
+    }
+
+    function _getNotifIcon(type) {
+        if (type.includes('لايك') || type.includes('أعجب')) return 'ph ph-heart';
+        if (type.includes('متابعة')) return 'ph ph-user-plus';
+        if (type.includes('تعليق') || type.includes('رد')) return 'ph ph-chat-circle-text';
+        return 'ph ph-bell';
+    }
+
+    function _getRelativeTime(date) {
+        const diff = Math.floor((new Date() - new Date(date)) / 60000);
+        if (diff < 1) return 'الآن';
+        if (diff < 60) return `منذ ${diff} دقيقة`;
+        if (diff < 1440) return `منذ ${Math.floor(diff/60)} ساعة`;
+        return `منذ ${Math.floor(diff/1440)} يوم`;
+    }
+
+    async function markNotifRead(id) {
+        // يمكن إضافة منطق للانتقال للمنشور المعني هنا
+    }
+
+async function loadStories() {
         const bar = document.getElementById('stories-bar');
         if (!bar) return;
         bar.innerHTML = '';
@@ -3013,91 +3067,99 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         try {
             const now = new Date().toISOString();
             let followingIds = [];
-            let myProfile = null;
-
             if (currentUser) {
-                // جلب بياناتي
-                const { data: p } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').eq('id', currentUser.id).maybeSingle();
-                myProfile = p;
-                
-                // جلب المتابعين
                 const { data: fw } = await _supabase.from('follows').select('following_id').eq('follower_id', currentUser.id);
                 followingIds = (fw || []).map(r => r.following_id);
             }
 
+            // جلب ستوريات المستخدم الحالي + المتابَعين
             const allowedIds = currentUser ? [currentUser.id, ...followingIds] : [];
-            
-            // جلب الستوريات
-            const { data: stories } = await _supabase
+            if (allowedIds.length === 0) { bar.style.display = 'none'; return; }
+
+            const { data: stories, error } = await _supabase
                 .from('stories')
                 .select('*')
                 .gt('expires_at', now)
                 .in('user_id', allowedIds)
-                .order('created_at', { ascending: true });
+                .order('created_at', { ascending: false });
 
-            const grouped = {};
-            if (stories) {
-                stories.forEach(s => {
-                    if (!grouped[s.user_id]) grouped[s.user_id] = [];
-                    grouped[s.user_id].push(s);
-                });
+            if (error || !stories || stories.length === 0) {
+                // إظهار زر الإضافة فقط إذا كان المستخدم مسجلاً
+                if (currentUser) {
+                    bar.style.display = 'flex';
+                    bar.innerHTML = _buildAddStoryCircle();
+                } else {
+                    bar.style.display = 'none';
+                }
+                return;
             }
 
+            // تجميع الستوريات حسب المستخدم
+            const grouped = {};
+            stories.forEach(s => {
+                if (!grouped[s.user_id]) grouped[s.user_id] = [];
+                grouped[s.user_id].push(s);
+            });
+
+            // جلب بيانات المستخدمين
+            const uIds = Object.keys(grouped);
+            const { data: profiles } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').in('id', uIds);
+            const profileMap = {};
+            (profiles || []).forEach(p => profileMap[p.id] = p);
+
+            // بناء شريط الستوريات
             let html = '';
 
-            // أولاً وقبل كل شيء: دائرة المستخدم الحالي (إضافة/عرض)
+            // أولاً: ستوري المستخدم الحالي
             if (currentUser) {
-                const myStories = grouped[currentUser.id] || [];
-                const myAvatar = myProfile?.profile_image || myProfile?.avatars_url || null;
-                const hasStories = myStories.length > 0;
-                
-                html += `
-                <div class="story-circle">
-                    <div class="${hasStories ? 'story-avatar-ring' : 'story-avatar-ring own-add'}" onclick="${hasStories ? `_openStoryViewerForUser('${currentUser.id}')` : `openStoryEditor()`}">
-                        <div class="story-avatar-inner">
-                            ${myAvatar ? `<img src="${myAvatar}" alt="">` : `<i class="ph ph-user" style="font-size:1.5rem;color:var(--nav-inactive);"></i>`}
-                        </div>
-                        <div class="story-add-plus" onclick="event.stopPropagation(); openStoryEditor()">+</div>
-                    </div>
-                    <span class="story-name">قصتك</span>
-                </div>`;
-            }
-
-            // ثانياً: بقية الستوريات (المتابَعين)
-            const otherUids = Object.keys(grouped).filter(id => id !== currentUser?.id);
-            if (otherUids.length > 0) {
-                const { data: otherProfiles } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').in('id', otherUids);
-                const profMap = {};
-                if (otherProfiles) otherProfiles.forEach(p => profMap[p.id] = p);
-
-                otherUids.forEach(uid => {
-                    const p = profMap[uid];
-                    if (!p) return;
-                    const avatar = p.profile_image || p.avatars_url;
-                    const name = p.full_name?.split(' ')[0] || 'مستخدم';
-                    
-                    html += `
-                    <div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
+                const myStories = grouped[currentUser.id];
+                const myProfile = profileMap[currentUser.id];
+                const myAvatar = myProfile?.avatars_url || myProfile?.profile_image || null;
+                const myName = localStorage.getItem('profile_name_' + currentUser.id) || 'أنت';
+                if (myStories && myStories.length > 0) {
+                    const initials = myName.substring(0, 2);
+                    html += `<div class="story-circle" onclick="_openStoryViewerForUser('${currentUser.id}')">
                         <div class="story-avatar-ring">
                             <div class="story-avatar-inner">
-                                ${avatar ? `<img src="${avatar}" alt="">` : `<div class="story-avatar-text">${name[0]}</div>`}
+                                ${myAvatar ? `<img src="${myAvatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1.1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1.1rem;">${initials}</span>`}
                             </div>
                         </div>
-                        <span class="story-name">${name}</span>
+                        <span class="story-name">ستوريك</span>
                     </div>`;
-                });
-
-                window._storiesProfiles = {...profMap, [currentUser?.id]: myProfile};
-            } else {
-                window._storiesProfiles = {[currentUser?.id]: myProfile};
+                } else {
+                    html += _buildAddStoryCircle(myAvatar, myName);
+                }
             }
+
+            // ثانياً: ستوريات المتابَعين
+            uIds.filter(uid => uid !== currentUser?.id).forEach(uid => {
+                const userStories = grouped[uid];
+                const prof = profileMap[uid];
+                const name = prof?.full_name || 'مستخدم';
+                const avatar = prof?.avatars_url || prof?.profile_image || null;
+                const initials = name.substring(0, 2);
+                const hasSeen = userStories.some(st => localStorage.getItem(`story_seen_${uid}_${st.id}`));
+                html += `<div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
+                    <div class="story-avatar-ring ${hasSeen ? 'seen' : ''}">
+                        <div class="story-avatar-inner">
+                            ${avatar ? `<img src="${avatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1rem;">${initials}</span>`}
+                        </div>
+                    </div>
+                    <span class="story-name">${name}</span>
+                </div>`;
+            });
 
             bar.style.display = 'flex';
             bar.innerHTML = html;
+
+            // تخزين بيانات الستوريات للعارض
             window._storiesData = grouped;
+            window._storiesProfiles = profileMap;
 
         } catch(e) {
-            console.error('Story Load Error:', e);
+            console.log('Stories error:', e.message);
+            if (currentUser) { bar.style.display = 'flex'; bar.innerHTML = _buildAddStoryCircle(); }
+            else bar.style.display = 'none';
         }
     }
 
@@ -3456,7 +3518,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         const { error } = await _supabase.from('stories').delete().eq('id', story.id);
         if (error) { alert('فشل الحذف: ' + error.message); return; }
         closeStoryViewer();
-        loadStories();
+        loadStories(); updateNotificationBadge();
     }
 
     function svNext() {
@@ -3493,7 +3555,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         if (_svTimer) clearTimeout(_svTimer);
         document.getElementById('story-viewer-modal').style.display = 'none';
         if (history.state && history.state.modal === 'story-viewer-modal') history.back();
-        loadStories();
+        loadStories(); updateNotificationBadge();
     }
 
     // ========================================================
