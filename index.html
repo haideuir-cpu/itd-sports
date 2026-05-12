@@ -3067,23 +3067,33 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
         _svTimer = setTimeout(() => svNext(), 5200);
     }
 
+    function _getStoryViewerId() {
+        let viewerId = localStorage.getItem('anon_viewer_id');
+        if (!viewerId) {
+            viewerId = crypto.randomUUID();
+            localStorage.setItem('anon_viewer_id', viewerId);
+        }
+        return currentUser?.id || viewerId;
+    }
+
     async function _recordAndShowStoryViews(story) {
-        const seenKey = `sv_${story.id}`;
+        const viewerId = _getStoryViewerId();
+        const seenKey = `sv_${story.id}_${viewerId}`;
         const viewsEl = document.getElementById('sv-views-num');
         // تسجيل المشاهدة في localStorage
         const alreadySeen = localStorage.getItem(seenKey);
         localStorage.setItem(seenKey, '1');
 
         // محاولة تسجيل في Supabase (story_views)
-        if (currentUser && !alreadySeen) {
+        if (!alreadySeen) {
             try {
                 const { error } = await _supabase.from('story_views').upsert(
-                    [{ story_id: story.id, viewer_id: currentUser.id }],
-                    { onConflict: 'story_id,viewer_id', ignoreDuplicates: true }
+                    [{ story_id: story.id, viewer_id: viewerId }],
+                    { onConflict: ['story_id', 'viewer_id'], ignoreDuplicates: true }
                 );
                 if (error) {
                     console.log('Story views error:', error.message);
-                    // إذا كان الجدول غير موجود، نحاول إنشاؤه
+                    // إذا كان الجدول غير موجود، نحاول تنبيه المستخدم لصاحب الستوري
                     if (error.message.includes('does not exist') || error.code === '42P01') {
                         _showStoryViewsSetupError();
                     }
