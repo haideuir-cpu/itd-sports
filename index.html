@@ -999,6 +999,86 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
     let voteEndTime = new Date().getTime();
     let voteTimerInterval = null;
 
+    // VAPID keys للإشعارات
+    const vapidPublicKey = 'YOUR_VAPID_PUBLIC_KEY_HERE'; // استبدل بمفتاحك العام
+
+    // طلب إذن الإشعارات وتسجيل الـ subscription
+    async function requestNotificationPermission() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            console.log('Push notifications not supported');
+            return;
+        }
+
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                console.log('Notification permission granted');
+                await registerPushSubscription();
+            } else {
+                console.log('Notification permission denied');
+            }
+        } catch (error) {
+            console.error('Error requesting notification permission:', error);
+        }
+    }
+
+    // تسجيل الـ subscription
+    async function registerPushSubscription() {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+            });
+
+            console.log('Push subscription:', subscription);
+
+            // حفظ الـ subscription في قاعدة البيانات
+            if (currentUser) {
+                await savePushSubscription(subscription);
+            }
+        } catch (error) {
+            console.error('Error registering push subscription:', error);
+        }
+    }
+
+    // حفظ الـ subscription في Supabase
+    async function savePushSubscription(subscription) {
+        try {
+            const { error } = await _supabase
+                .from('push_subscriptions')
+                .upsert({
+                    user_id: currentUser.id,
+                    subscription: JSON.stringify(subscription),
+                    created_at: new Date().toISOString()
+                });
+
+            if (error) {
+                console.error('Error saving push subscription:', error);
+            } else {
+                console.log('Push subscription saved');
+            }
+        } catch (error) {
+            console.error('Error saving push subscription:', error);
+        }
+    }
+
+    // تحويل VAPID key من base64 إلى Uint8Array
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding)
+            .replace(/-/g, '+')
+            .replace(/_/g, '/');
+
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
     const POSITIONS = {
         'GK': {t:90, l:50, zone:'D'},
         'LB': {t:72, l:15, zone:'D'}, 'CB1': {t:78, l:35, zone:'D'}, 'CB2': {t:78, l:65, zone:'D'}, 'RB': {t:72, l:85, zone:'D'},
@@ -1042,6 +1122,8 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
                 await fetchUserPoints();
                 fetchNotifications();
                 _subscribeVerifiedRealtime(currentUser.id);
+                // طلب إذن الإشعارات
+                requestNotificationPermission();
             }
             updateAuthUI();
             _supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -1119,6 +1201,8 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
                 if(data.is_verified) localStorage.setItem('is_verified_' + currentUser.id, 'true');
                 else localStorage.removeItem('is_verified_' + currentUser.id);
             } else { currentUserPoints = 0; }
+            // تحديث قائمة المتابعين
+            await loadFollowingSet();
             updateAuthUI();
         } catch(e) { console.log("Profiles:", e.message); }
     }
@@ -1908,7 +1992,7 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
             ${avatarHtml}
             <div class="v-comment-content">
                 <div class="v-comment-header">
-                    <span class="v-comment-author" style="${isReply ? 'font-size: 0.85rem;' : ''}; display:flex; align-items:center; gap:4px;">${uName}${verifiedBadge}</span>
+                    <span class="v-comment-author" style="${isReply ? 'font-size: 0.85rem;' : ''}; display:flex; align-items:center; gap:4px; cursor:pointer;" onclick="openUserProfile('${authorIdSafe}')">${uName}${verifiedBadge}</span>
                     <span class="v-comment-time">${timeStr}</span>
                 </div>
                 <div class="v-comment-text" style="${isReply ? 'font-size: 0.85rem;' : ''}">${c.comment}</div>
@@ -2023,7 +2107,7 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
             }
         }
         span.textContent = newVal;
-        try { let updates = {}; updates[type] = newVal; await _supabase.from('match_comments').update(updates).eq('id', commentId); } catch(err) {}
+        try { let updates = {}; updates[type] = newVal; await _supabase.from('match_comments').update(updates).eq('id', commentId); } catch(err) { console.log('خطأ في تحديث اللايك:', err); }
     }
 
     let longPressTimer;
