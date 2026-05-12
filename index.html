@@ -413,6 +413,9 @@
         .sv-tap-right { position: absolute; right: 0; top: 0; bottom: 0; width: 35%; z-index: 15; cursor: pointer; }
         .sv-bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(transparent, rgba(0,0,0,0.7)); padding: 30px 16px 16px; display: flex; align-items: center; justify-content: space-between; }
         .sv-views-count { color: rgba(255,255,255,0.85); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+        .sv-like-btn { display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #ff4d4d; padding: 10px 14px; border-radius: 999px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; }
+        .sv-like-btn.active { background: rgba(255,77,77,0.2); border-color: #ff4d4d; color: white; }
+        .sv-like-btn:hover { transform: scale(1.02); }
         .sv-delete-btn { background: rgba(255,50,50,0.8); border: none; color: white; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
 
         /* ===== نافذة اقتصاص الصورة الشخصية ===== */
@@ -838,7 +841,16 @@ CREATE TABLE IF NOT EXISTS story_views (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(story_id, viewer_id)
 );
-ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
+
+CREATE TABLE IF NOT EXISTS story_likes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  story_id UUID REFERENCES stories(id) ON DELETE CASCADE,
+  viewer_id UUID,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(story_id, viewer_id)
+);
+ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;
+ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         <button onclick="_copyRlsSql()" id="rls-copy-btn" style="width:100%;margin-top:14px;background:#1e90ff;color:white;border:none;padding:13px;border-radius:12px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:'Tajawal',sans-serif;">📋 نسخ الكود</button>
         <p style="color:#8e99a2;font-size:0.78rem;text-align:center;margin:10px 0 0;">بعد تشغيل الكود في Supabase، انشر الستوري مجدداً</p>
     </div>
@@ -861,7 +873,8 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
         <div class="sv-tap-left" onclick="svPrev()"></div>
         <div class="sv-tap-right" onclick="svNext()"></div>
         <div class="sv-bottom-bar" id="sv-bottom-bar">
-            <div class="sv-views-count" id="sv-views-count" style="cursor:pointer;display:none;" onclick="openStoryViewersList()"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
+            <button class="sv-like-btn" id="sv-like-btn" type="button" style="display:none;" onclick="toggleStoryLike()">🤍 أعجبني</button>
+        <div class="sv-views-count" id="sv-views-count" style="cursor:pointer;display:none;" onclick="openStoryViewersList()"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
             <button class="sv-delete-btn" id="sv-delete-btn" style="display:none;" onclick="deleteCurrentStory()">🗑️</button>
         </div>
     </div>
@@ -3027,10 +3040,9 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
                 const name = prof?.full_name || 'مستخدم';
                 const avatar = prof?.avatars_url || prof?.profile_image || null;
                 const initials = name.substring(0, 2);
-                const seenKey = `story_seen_${uid}_${userStories[0]?.id}`;
-                const isSeen = localStorage.getItem(seenKey);
+                const hasSeen = userStories.some(st => localStorage.getItem(`story_seen_${uid}_${st.id}`));
                 html += `<div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
-                    <div class="story-avatar-ring ${isSeen ? 'seen' : ''}">
+                    <div class="story-avatar-ring ${hasSeen ? 'seen' : ''}">
                         <div class="story-avatar-inner">
                             ${avatar ? `<img src="${avatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1rem;">${initials}</span>`}
                         </div>
@@ -3142,8 +3154,13 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
         // زر الحذف والمشاهدات — يظهران فقط لصاحب الستوري
         const delBtn = document.getElementById('sv-delete-btn');
         const viewsCount = document.getElementById('sv-views-count');
+        const likeBtn = document.getElementById('sv-like-btn');
         if (delBtn) delBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
         if (viewsCount) viewsCount.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
+        if (likeBtn) {
+            likeBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'none' : 'flex';
+            _updateStoryLikeButton(story);
+        }
 
         // تسجيل المشاهدة وجلب العدد
         _recordAndShowStoryViews(story);
@@ -3162,22 +3179,21 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
 
     async function _recordAndShowStoryViews(story) {
         const viewerId = _getStoryViewerId();
-        const seenKey = `sv_${story.id}_${viewerId}`;
+        const seenKey = `story_seen_${story.user_id}_${story.id}`;
         const viewsEl = document.getElementById('sv-views-num');
-        // تسجيل المشاهدة في localStorage
-        const alreadySeen = localStorage.getItem(seenKey);
+        // تسجيل المشاهدة في localStorage كمشاهدة على مستوى المستخدم
         localStorage.setItem(seenKey, '1');
 
         // محاولة تسجيل في Supabase (story_views)
-        if (!alreadySeen) {
+        if (!localStorage.getItem(`story_view_recorded_${story.id}_${viewerId}`)) {
             try {
                 const { error } = await _supabase.from('story_views').upsert(
                     [{ story_id: story.id, viewer_id: viewerId }],
                     { onConflict: ['story_id', 'viewer_id'], ignoreDuplicates: true }
                 );
+                localStorage.setItem(`story_view_recorded_${story.id}_${viewerId}`, '1');
                 if (error) {
                     console.log('Story views error:', error.message);
-                    // إذا كان الجدول غير موجود، نحاول تنبيه المستخدم لصاحب الستوري
                     if (error.message.includes('does not exist') || error.code === '42P01') {
                         _showStoryViewsSetupError();
                     }
@@ -3211,6 +3227,92 @@ ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;</div>
 
         // تخزين معرف الستوري الحالي لاستخدامه في عرض المشاهدين
         window._currentStoryViewing = story;
+    }
+
+    function _storyLikeStorageKey(story) {
+        const viewerId = _getStoryViewerId();
+        return `story_like_${story.id}_${viewerId}`;
+    }
+
+    async function _fetchStoryLikeStatus(story) {
+        const key = _storyLikeStorageKey(story);
+        let liked = localStorage.getItem(key) === '1';
+        try {
+            const viewerId = _getStoryViewerId();
+            const { count, error } = await _supabase.from('story_likes')
+                .select('*', { count: 'exact', head: true })
+                .eq('story_id', story.id)
+                .eq('viewer_id', viewerId);
+            if (!error && count !== null) {
+                liked = count > 0;
+            }
+        } catch (e) {
+            console.log('Story like status fetch failed:', e.message);
+        }
+        if (liked) localStorage.setItem(key, '1');
+        else localStorage.removeItem(key);
+        return liked;
+    }
+
+    async function _updateStoryLikeButton(story) {
+        const likeBtn = document.getElementById('sv-like-btn');
+        if (!likeBtn || !story) return;
+        const liked = await _fetchStoryLikeStatus(story);
+        likeBtn.textContent = liked ? '❤️ معجب' : '🤍 أعجبني';
+        likeBtn.classList.toggle('active', liked);
+    }
+
+    async function toggleStoryLike() {
+        const story = window._currentStoryViewing;
+        if (!story) return;
+        const likeBtn = document.getElementById('sv-like-btn');
+        const key = _storyLikeStorageKey(story);
+        const currentlyLiked = localStorage.getItem(key) === '1';
+        if (likeBtn) likeBtn.disabled = true;
+
+        try {
+            const viewerId = _getStoryViewerId();
+            if (!currentlyLiked) {
+                const { error } = await _supabase.from('story_likes').insert([
+                    { story_id: story.id, viewer_id: viewerId }
+                ]);
+                if (error) throw error;
+                localStorage.setItem(key, '1');
+                if (story.user_id && currentUser && story.user_id !== currentUser.id) {
+                    const myName = localStorage.getItem('profile_name_' + currentUser.id) || currentUser.email?.split('@')[0] || 'مستخدم';
+                    sendNotif(story.user_id, '❤️ أعجبك ستوري', `أعجب ${myName} بستوريك.`);
+                }
+            } else {
+                const { error } = await _supabase.from('story_likes')
+                    .delete()
+                    .eq('story_id', story.id)
+                    .eq('viewer_id', viewerId);
+                if (error) throw error;
+                localStorage.removeItem(key);
+            }
+        } catch (e) {
+            console.log('Story like save failed:', e?.message || e);
+            const isMissingTable = (e?.message && e.message.includes('does not exist')) || e?.code === '42P01';
+            if (isMissingTable) {
+                if (!currentlyLiked) localStorage.setItem(key, '1');
+                else localStorage.removeItem(key);
+                _showStoryLikesSetupError();
+            } else {
+                if (currentlyLiked) localStorage.removeItem(key);
+                else localStorage.setItem(key, '1');
+            }
+        } finally {
+            if (likeBtn) likeBtn.disabled = false;
+            _updateStoryLikeButton(story);
+        }
+    }
+
+    function _showStoryLikesSetupError() {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:#ff6b35;color:white;padding:12px 20px;border-radius:25px;font-weight:bold;font-size:0.9rem;z-index:9999;max-width:300px;text-align:center;animation:slideIn 0.3s ease-out;';
+        toast.textContent = '⚠️ تحتاج إعداد جدول إعجابات الستوري. افتح نافذة الإصلاح في Supabase والصق الكود المضاف.';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
     }
 
     function _showStoryViewsSetupError() {
