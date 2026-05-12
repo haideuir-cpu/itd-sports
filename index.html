@@ -438,7 +438,49 @@
         .follow-item-name { font-weight: bold; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; }
         .follow-item-meta { color: var(--nav-inactive); font-size: 0.8rem; margin-top: 2px; }
         .follow-list-empty { text-align: center; padding: 60px 20px; color: var(--nav-inactive); font-size: 1rem; }
-    </style>
+    
+.story-circle {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 75px;
+    cursor: pointer;
+}
+.story-avatar-ring {
+    position: relative; /* هذا هو السطر الأهم لضمان بقاء الزائد داخل الدائرة */
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    padding: 2px;
+    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 5px;
+}
+.story-avatar-ring.own-add {
+    background: #2c3e50; /* لون مختلف لتمييز الإضافة */
+}
+.story-add-plus {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: #0095f6;
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #0b1116; /* لون خلفية التطبيق */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 2;
+}
+
+</style>
 </head>
 <body>
 <div id="install-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#0b1116,#162029);padding:12px 16px;border-bottom:1px solid #24313d;align-items:center;justify-content:space-between;gap:10px;">
@@ -2962,6 +3004,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
     }
 
     // تحميل شريط الستوري
+    
     async function loadStories() {
         const bar = document.getElementById('stories-bar');
         if (!bar) return;
@@ -2970,99 +3013,91 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         try {
             const now = new Date().toISOString();
             let followingIds = [];
+            let myProfile = null;
+
             if (currentUser) {
+                // جلب بياناتي
+                const { data: p } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').eq('id', currentUser.id).maybeSingle();
+                myProfile = p;
+                
+                // جلب المتابعين
                 const { data: fw } = await _supabase.from('follows').select('following_id').eq('follower_id', currentUser.id);
                 followingIds = (fw || []).map(r => r.following_id);
             }
 
-            // جلب ستوريات المستخدم الحالي + المتابَعين
             const allowedIds = currentUser ? [currentUser.id, ...followingIds] : [];
-            if (allowedIds.length === 0) { bar.style.display = 'none'; return; }
-
-            const { data: stories, error } = await _supabase
+            
+            // جلب الستوريات
+            const { data: stories } = await _supabase
                 .from('stories')
                 .select('*')
                 .gt('expires_at', now)
                 .in('user_id', allowedIds)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: true });
 
-            if (error || !stories || stories.length === 0) {
-                // إظهار زر الإضافة فقط إذا كان المستخدم مسجلاً
-                if (currentUser) {
-                    bar.style.display = 'flex';
-                    bar.innerHTML = _buildAddStoryCircle();
-                } else {
-                    bar.style.display = 'none';
-                }
-                return;
+            const grouped = {};
+            if (stories) {
+                stories.forEach(s => {
+                    if (!grouped[s.user_id]) grouped[s.user_id] = [];
+                    grouped[s.user_id].push(s);
+                });
             }
 
-            // تجميع الستوريات حسب المستخدم
-            const grouped = {};
-            stories.forEach(s => {
-                if (!grouped[s.user_id]) grouped[s.user_id] = [];
-                grouped[s.user_id].push(s);
-            });
-
-            // جلب بيانات المستخدمين
-            const uIds = Object.keys(grouped);
-            const { data: profiles } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').in('id', uIds);
-            const profileMap = {};
-            (profiles || []).forEach(p => profileMap[p.id] = p);
-
-            // بناء شريط الستوريات
             let html = '';
 
-            // أولاً: ستوري المستخدم الحالي
+            // أولاً وقبل كل شيء: دائرة المستخدم الحالي (إضافة/عرض)
             if (currentUser) {
-                const myStories = grouped[currentUser.id];
-                const myProfile = profileMap[currentUser.id];
-                const myAvatar = myProfile?.avatars_url || myProfile?.profile_image || null;
-                const myName = localStorage.getItem('profile_name_' + currentUser.id) || 'أنت';
-                if (myStories && myStories.length > 0) {
-                    const initials = myName.substring(0, 2);
-                    html += `<div class="story-circle" onclick="_openStoryViewerForUser('${currentUser.id}')">
-                        <div class="story-avatar-ring">
-                            <div class="story-avatar-inner">
-                                ${myAvatar ? `<img src="${myAvatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1.1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1.1rem;">${initials}</span>`}
-                            </div>
+                const myStories = grouped[currentUser.id] || [];
+                const myAvatar = myProfile?.profile_image || myProfile?.avatars_url || null;
+                const hasStories = myStories.length > 0;
+                
+                html += `
+                <div class="story-circle">
+                    <div class="${hasStories ? 'story-avatar-ring' : 'story-avatar-ring own-add'}" onclick="${hasStories ? `_openStoryViewerForUser('${currentUser.id}')` : `openStoryEditor()`}">
+                        <div class="story-avatar-inner">
+                            ${myAvatar ? `<img src="${myAvatar}" alt="">` : `<i class="ph ph-user" style="font-size:1.5rem;color:var(--nav-inactive);"></i>`}
                         </div>
-                        <span class="story-name">ستوريك</span>
-                    </div>`;
-                } else {
-                    html += _buildAddStoryCircle(myAvatar, myName);
-                }
+                        <div class="story-add-plus" onclick="event.stopPropagation(); openStoryEditor()">+</div>
+                    </div>
+                    <span class="story-name">قصتك</span>
+                </div>`;
             }
 
-            // ثانياً: ستوريات المتابَعين
-            uIds.filter(uid => uid !== currentUser?.id).forEach(uid => {
-                const userStories = grouped[uid];
-                const prof = profileMap[uid];
-                const name = prof?.full_name || 'مستخدم';
-                const avatar = prof?.avatars_url || prof?.profile_image || null;
-                const initials = name.substring(0, 2);
-                const hasSeen = userStories.some(st => localStorage.getItem(`story_seen_${uid}_${st.id}`));
-                html += `<div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
-                    <div class="story-avatar-ring ${hasSeen ? 'seen' : ''}">
-                        <div class="story-avatar-inner">
-                            ${avatar ? `<img src="${avatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1rem;">${initials}</span>`}
+            // ثانياً: بقية الستوريات (المتابَعين)
+            const otherUids = Object.keys(grouped).filter(id => id !== currentUser?.id);
+            if (otherUids.length > 0) {
+                const { data: otherProfiles } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').in('id', otherUids);
+                const profMap = {};
+                if (otherProfiles) otherProfiles.forEach(p => profMap[p.id] = p);
+
+                otherUids.forEach(uid => {
+                    const p = profMap[uid];
+                    if (!p) return;
+                    const avatar = p.profile_image || p.avatars_url;
+                    const name = p.full_name?.split(' ')[0] || 'مستخدم';
+                    
+                    html += `
+                    <div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
+                        <div class="story-avatar-ring">
+                            <div class="story-avatar-inner">
+                                ${avatar ? `<img src="${avatar}" alt="">` : `<div class="story-avatar-text">${name[0]}</div>`}
+                            </div>
                         </div>
-                    </div>
-                    <span class="story-name">${name}</span>
-                </div>`;
-            });
+                        <span class="story-name">${name}</span>
+                    </div>`;
+                });
+
+                window._storiesProfiles = {...profMap, [currentUser?.id]: myProfile};
+            } else {
+                window._storiesProfiles = {[currentUser?.id]: myProfile};
+            }
 
             bar.style.display = 'flex';
             bar.innerHTML = html;
-
-            // تخزين بيانات الستوريات للعارض
             window._storiesData = grouped;
-            window._storiesProfiles = profileMap;
 
         } catch(e) {
-            console.log('Stories error:', e.message);
-            if (currentUser) { bar.style.display = 'flex'; bar.innerHTML = _buildAddStoryCircle(); }
-            else bar.style.display = 'none';
+            console.error('Story Load Error:', e);
         }
     }
 
