@@ -26,7 +26,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;700;900&family=Readex+Pro:wght@400;700&family=Reem+Kufi:wght@400;700&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
     <style>
         :root { 
             --bg: #0b1116; --card: #162029; --accent: #1e90ff; 
@@ -63,11 +62,27 @@
         .notif-badge { position: absolute; top: 12px; left: 25%; background: #ff4d4d; color: white; font-size: 10px; width: 8px; height: 8px; border-radius: 50%; display: none; border: 1.5px solid var(--bg); }
         .notif-badge-active { display: block; }
 
-        .notif-card { background: var(--card); border: 1px solid var(--border); padding: 12px; border-radius: 10px; margin-bottom: 10px; border-right: 4px solid var(--accent); animation: slideIn 0.3s ease-out; }
+        .header-action { position: relative; width: 42px; height: 42px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); transition: background 0.25s ease, transform 0.2s ease, border-color 0.25s ease; cursor: pointer; }
+        .header-action:hover { background: rgba(255,255,255,0.14); transform: translateY(-1px); border-color: rgba(255,255,255,0.18); }
+        .header-action svg { width: 22px; height: 22px; }
+        .header-action .notif-dot { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; border-radius: 50%; background: #ff4d4d; border: 2px solid var(--bg); box-shadow: 0 0 0 3px rgba(255,77,77,0.16); display: none; }
+        .header-action .notif-dot.visible { display: block; }
+
+        .notif-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); padding: 16px; border-radius: 16px; margin-bottom: 12px; border-left: 4px solid var(--accent); box-shadow: 0 12px 30px rgba(0,0,0,0.12); animation: slideIn 0.3s ease-out; display: flex; gap: 14px; align-items: flex-start; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-        .notif-card b { display: block; margin-bottom: 4px; color: var(--accent); font-size: 0.9rem; }
-        .notif-card span { font-size: 0.85rem; line-height: 1.4; }
-        .notif-card small { color: var(--nav-inactive); font-size: 10px; display: block; margin-top: 8px; }
+        .notif-card .notif-avatar { width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; overflow: hidden; border: 2px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; }
+        .notif-card .notif-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .notif-card .notif-content { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+        .notif-card b { display: block; margin: 0; color: white; font-size: 1rem; line-height: 1.3; }
+        .notif-card span { font-size: 0.9rem; line-height: 1.6; color: var(--text); }
+        .notif-card small { color: var(--nav-inactive); font-size: 0.78rem; display: block; margin-top: 4px; }
+        .notif-card.unread { background: linear-gradient(135deg, rgba(30,144,255,0.15), rgba(22,32,41,1)); border-color: rgba(30,144,255,0.35); }
+        .notif-card.unread b { color: #1e90ff; }
+        .notif-card.read { opacity: 0.75; }
+        .notif-card .notif-message { color: var(--text); }
+        .notif-card .notif-title-row { display: flex; align-items: center; gap: 8px; }
+        .notif-card .notif-title-row strong { display: inline-block; }
+        .notif-card .notif-avatar-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 0.95rem; color: var(--text); font-weight: bold; background: rgba(255,255,255,0.08); }
 
         .match-card { background: var(--card); margin-bottom: 12px; padding: 15px; border-radius: 12px; display: flex; align-items: center; border: 1px solid var(--border); }
         .team-clickable { width: 30%; text-align: center; cursor: pointer; transition: transform 0.2s; }
@@ -324,6 +339,10 @@
         .verified-pill .verified-badge { margin-right: 0; width: 16px; height: 16px; animation: none; }
         .verified-pill .verified-badge svg { width: 9px; height: 9px; }
 
+        .avatar-wrapper { position: relative; display: inline-block; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; }
+        .avatar-wrapper.follow { width: 50px; height: 50px; }
+        .avatar-wrapper.has-story { padding: 3px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
+
         #search-modal { display: none; position: fixed; inset: 0; background: var(--bg); z-index: 3000; flex-direction: column; }
         .search-header { padding: 12px 15px; background: var(--bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
         .search-input-wrap { flex: 1; display: flex; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 25px; padding: 8px 15px; gap: 8px; }
@@ -366,10 +385,10 @@
         .stories-bar { display: flex; gap: 12px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .stories-bar::-webkit-scrollbar { display: none; }
         .story-circle { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .story-avatar-ring { width: 64px; height: 64px; border-radius: 50%; padding: 3px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); flex-shrink: 0; }
+        .story-avatar-ring { width: 64px; height: 64px; border-radius: 50%; padding: 4px; background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); flex-shrink: 0; }
         .story-avatar-ring.seen { background: var(--border); }
-        .story-avatar-ring.own-add { background: transparent; border: 2.5px dashed var(--accent); display: flex; align-items: center; justify-content: center; position: relative; }
-        .story-avatar-inner { width: 100%; height: 100%; border-radius: 50%; border: 2.5px solid var(--bg); overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--card); }
+        .story-avatar-ring.own-add { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); border: none; display: flex; align-items: center; justify-content: center; position: relative; }
+        .story-avatar-inner { width: 100%; height: 100%; border-radius: 50%; border: 2.5px solid white; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--card); }
         .story-avatar-inner img { width: 100%; height: 100%; object-fit: cover; }
         .story-name { font-size: 0.68rem; color: var(--text); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; }
         .story-add-plus { position: absolute; bottom: -2px; right: -2px; background: var(--accent); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg); font-size: 14px; color: white; font-weight: 900; line-height: 1; }
@@ -414,9 +433,6 @@
         .sv-tap-right { position: absolute; right: 0; top: 0; bottom: 0; width: 35%; z-index: 15; cursor: pointer; }
         .sv-bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; background: linear-gradient(transparent, rgba(0,0,0,0.7)); padding: 30px 16px 16px; display: flex; align-items: center; justify-content: space-between; }
         .sv-views-count { color: rgba(255,255,255,0.85); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
-        .sv-like-btn { display: flex; align-items: center; justify-content: center; gap: 6px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #ff4d4d; padding: 10px 14px; border-radius: 999px; font-size: 0.85rem; cursor: pointer; transition: 0.2s; }
-        .sv-like-btn.active { background: rgba(255,77,77,0.2); border-color: #ff4d4d; color: white; }
-        .sv-like-btn:hover { transform: scale(1.02); }
         .sv-delete-btn { background: rgba(255,50,50,0.8); border: none; color: white; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center; }
 
         /* ===== نافذة اقتصاص الصورة الشخصية ===== */
@@ -466,9 +482,9 @@
         <div onclick="openSearchModal()" style="cursor:pointer; color:var(--nav-inactive); display:flex; align-items:center;">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
         </div>
-        <div id="notif-bell" onclick="openNotifications()" style="cursor: pointer; color: var(--nav-inactive); display: flex; align-items: center; position:relative;">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
-            <div id="notif-dot" style="display: none; position: absolute; top: -2px; right: 0px; width: 10px; height: 10px; background: #ff4d4d; border-radius: 50%; border: 2px solid var(--bg);"></div>
+        <div id="notif-bell" class="header-action" onclick="openNotifications()" title="الإشعارات">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+            <div id="notif-dot" class="notif-dot"></div>
         </div>
     </div>
 </header>
@@ -592,7 +608,7 @@
     <div style="display: flex; height: 100%; align-items: center; justify-content: center;">
         <div class="p-profile-card" style="padding: 30px 20px; text-align: center; max-width: 340px;">
             <button class="p-close" onclick="closeModal('gift-modal')">✕</button>
-            <div style="font-size: 4rem; margin-top: 10px;"><i class="ph ph-gift" style="font-size:3.5rem;color:var(--gold);"></i></div>
+            <div style="font-size: 4rem; margin-top: 10px;">🎁</div>
             <h2 style="margin-top: 10px; color: var(--gold); font-size: 1.3rem;">إرسال هدية</h2>
             <p style="color: var(--nav-inactive); font-size: 0.9rem; line-height: 1.5; margin-bottom: 20px;">قم بإدخال اسم المستخدم لصديقك. سيتم خصم <b style="color:white;">50 نقطة</b> من رصيدك.</p>
             <input type="text" id="gift-receiver" class="auth-input" placeholder="اسم المستخدم المستلم" style="text-align: center;">
@@ -691,9 +707,9 @@
             <div class="stat-v"><b id="p-motm">0</b><small>رجل المباراة</small></div>
         </div>
         <div class="p-pen-sec">
-            <div class="pen-v p-suc"><i class="ph ph-check-circle" style="color:#2ecc71;font-size:1.1rem;vertical-align:middle;"></i> <span id="p-pen-scored">0</span></div>
+            <div class="pen-v p-suc">✔️ <span id="p-pen-scored">0</span></div>
             <div style="color:var(--nav-inactive); font-size:0.85rem; font-weight:bold;">ركلات الجزاء</div>
-            <div class="pen-v p-mis"><span id="p-pen-missed">0</span> <i class="ph ph-x-circle" style="color:#ff4d4d;font-size:1.1rem;vertical-align:middle;"></i></div>
+            <div class="pen-v p-mis"><span id="p-pen-missed">0</span> ❌</div>
         </div>
     </div>
 </div>
@@ -765,7 +781,7 @@
         </div>
         <div class="user-profile-pts">
             <span id="umod-email-label" style="color:var(--nav-inactive);font-size:0.85rem;"></span>
-            <span id="umod-pts-badge" style="font-size:0.9rem;display:flex;align-items:center;gap:4px;"><i class="ph-fill ph-star" style="color:var(--gold);"></i> <span id="umod-pts-val">0</span> نقطة</span>
+            <span id="umod-pts-badge" style="font-size:0.9rem;">⭐ <span id="umod-pts-val">0</span> نقطة</span>
         </div>
         <div style="height:20px;"></div>
     </div>
@@ -792,7 +808,7 @@
     </div>
     <div class="story-preview-area" id="story-preview-area">
         <div class="story-bg-placeholder" id="story-bg-placeholder">
-            <div style="font-size:3rem;margin-bottom:10px;"><i class="ph ph-image-square" style="font-size:3rem;color:rgba(255,255,255,0.3);"></i></div>
+            <div style="font-size:3rem;margin-bottom:10px;">📸</div>
             <div>اضغط على "اختر صورة" لإضافة صورة</div>
         </div>
         <img id="story-preview-img" class="story-bg-img" style="display:none;" src="">
@@ -806,7 +822,7 @@
         </div>
         <div class="story-editor-actions">
             <label class="story-upload-photo-btn">
-                <i class="ph ph-camera" style="font-size:1.2rem;"></i> اختر صورة
+                📷 اختر صورة
                 <input type="file" accept="image/*" id="story-photo-input" style="display:none;" onchange="onStoryPhotoSelected(event)">
             </label>
             <button class="story-submit-btn" id="story-submit-btn" onclick="submitStory()">نشر الستوري</button>
@@ -818,8 +834,8 @@
 <div id="rls-fix-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9000;justify-content:center;align-items:center;padding:20px;">
     <div style="background:#162029;border:1px solid #1e90ff;border-radius:20px;padding:25px 20px;max-width:420px;width:100%;position:relative;">
         <button onclick="document.getElementById('rls-fix-modal').style.display='none'" style="position:absolute;top:12px;left:12px;background:rgba(255,255,255,0.1);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;">✕</button>
-        <div style="font-size:2rem;text-align:center;margin-bottom:10px;"><i class="ph ph-warning" style="font-size:2.2rem;color:#f1c40f;"></i></div>
-        <h3 style="color:#f1c40f;text-align:center;margin:0 0 10px;">يجب تفعيل صلاحيات جدول stories</h3>
+        <div style="font-size:2rem;text-align:center;margin-bottom:10px;">⚠️</div>
+        <h3 style="color:#f1c40f;text-align:center;margin:0 0 10px;">يجب تفعيل صلاحيات جداول الستوري والإشعارات</h3>
         <p style="color:#8e99a2;font-size:0.85rem;text-align:center;margin-bottom:15px;">اذهب إلى <b style="color:white;">Supabase → SQL Editor</b> والصق هذا الكود:</p>
         <div style="background:#0b1116;border:1px solid #24313d;border-radius:12px;padding:15px;font-family:monospace;font-size:0.75rem;color:#2ecc71;line-height:1.7;white-space:pre-wrap;overflow-x:auto;" id="rls-sql-block">-- 1) جدول الستوريات
 CREATE TABLE IF NOT EXISTS stories (
@@ -842,17 +858,30 @@ CREATE TABLE IF NOT EXISTS story_views (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(story_id, viewer_id)
 );
+ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;
 
-CREATE TABLE IF NOT EXISTS story_likes (
+-- 3) جدول الإشعارات
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  actor_id UUID,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
+
+-- 4) جدول القلوب على الستوري
+CREATE TABLE IF NOT EXISTS story_hearts (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   story_id UUID REFERENCES stories(id) ON DELETE CASCADE,
-  viewer_id UUID,
+  user_id UUID,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(story_id, viewer_id)
+  UNIQUE(story_id, user_id)
 );
-ALTER TABLE story_views DISABLE ROW LEVEL SECURITY;
-ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
-        <button onclick="_copyRlsSql()" id="rls-copy-btn" style="width:100%;margin-top:14px;background:#1e90ff;color:white;border:none;padding:13px;border-radius:12px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:'Tajawal',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;"><i class="ph ph-clipboard-text" style="font-size:1.2rem;"></i> نسخ الكود</button>
+ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
+        <button onclick="_copyRlsSql()" id="rls-copy-btn" style="width:100%;margin-top:14px;background:#1e90ff;color:white;border:none;padding:13px;border-radius:12px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:'Tajawal',sans-serif;">📋 نسخ الكود</button>
         <p style="color:#8e99a2;font-size:0.78rem;text-align:center;margin:10px 0 0;">بعد تشغيل الكود في Supabase، انشر الستوري مجدداً</p>
     </div>
 </div>
@@ -874,9 +903,13 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         <div class="sv-tap-left" onclick="svPrev()"></div>
         <div class="sv-tap-right" onclick="svNext()"></div>
         <div class="sv-bottom-bar" id="sv-bottom-bar">
-            <button class="sv-like-btn" id="sv-like-btn" type="button" style="display:none;" onclick="toggleStoryLike()"><i class="ph ph-heart" style="font-size:1.1rem;vertical-align:middle;"></i> أعجبني</button>
-        <div class="sv-views-count" id="sv-views-count" style="cursor:pointer;display:none;" onclick="openStoryViewersList()"><i class="ph ph-eye" style="font-size:1.2rem;vertical-align:middle;"></i> <span id="sv-views-num">0</span> مشاهدة</div>
-            <button class="sv-delete-btn" id="sv-delete-btn" style="display:none;" onclick="deleteCurrentStory()"><i class="ph ph-trash" style="font-size:1.1rem;"></i></button>
+            <div class="sv-views-count" id="sv-views-count" style="cursor:pointer;display:none;" onclick="openStoryViewersList()"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
+            <div id="sv-heart-btn" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);padding:8px 16px;border-radius:20px;cursor:pointer;transition:0.2s;" onclick="toggleStoryHeart()">
+                <span id="sv-heart-icon" style="font-size:1.2rem;">🤍</span>
+                <span id="sv-hearts-num" style="font-size:0.9rem;color:rgba(255,255,255,0.8);">0</span>
+            </div>
+            <div id="sv-add-btn" style="display:none;background:rgba(255,255,255,0.1);border:none;color:white;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.4rem;display:flex;align-items:center;justify-content:center;" onclick="openStoryEditor()">+</div>
+            <button class="sv-delete-btn" id="sv-delete-btn" style="display:none;" onclick="deleteCurrentStory()">🗑️</button>
         </div>
     </div>
 </div>
@@ -901,11 +934,11 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
     </div>
     <p class="crop-hint">اسحب الصورة لضبط موضعها داخل الدائرة</p>
     <div class="crop-zoom-row">
-        <label><i class="ph ph-magnifying-glass-plus" style="vertical-align:middle;"></i> التكبير</label>
+        <label>🔍 التكبير</label>
         <input type="range" class="crop-zoom-slider" id="crop-zoom-slider" min="0.5" max="3" step="0.01" value="1" oninput="_cropZoomChange(this.value)">
     </div>
     <div style="display:flex;gap:12px;margin-top:18px;width:100%;max-width:300px;">
-        <button onclick="_confirmAvatarCrop()" style="flex:1;background:var(--accent);color:white;border:none;padding:13px;border-radius:14px;font-size:1rem;font-weight:bold;font-family:'Tajawal',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;"><i class="ph ph-check-circle" style="font-size:1.2rem;"></i> تأكيد</button>
+        <button onclick="_confirmAvatarCrop()" style="flex:1;background:var(--accent);color:white;border:none;padding:13px;border-radius:14px;font-size:1rem;font-weight:bold;font-family:'Tajawal',sans-serif;cursor:pointer;">✅ تأكيد</button>
         <button onclick="document.getElementById('avatar-crop-modal').style.display='none'" style="flex:1;background:rgba(255,255,255,0.1);color:white;border:1px solid rgba(255,255,255,0.2);padding:13px;border-radius:14px;font-size:1rem;font-family:'Tajawal',sans-serif;cursor:pointer;">إلغاء</button>
     </div>
 </div>
@@ -1013,86 +1046,6 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
     let voteEndTime = new Date().getTime();
     let voteTimerInterval = null;
 
-    // VAPID keys للإشعارات
-    const vapidPublicKey = 'YOUR_VAPID_PUBLIC_KEY_HERE'; // استبدل بمفتاحك العام
-
-    // طلب إذن الإشعارات وتسجيل الـ subscription
-    async function requestNotificationPermission() {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            console.log('Push notifications not supported');
-            return;
-        }
-
-        try {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                console.log('Notification permission granted');
-                await registerPushSubscription();
-            } else {
-                console.log('Notification permission denied');
-            }
-        } catch (error) {
-            console.error('Error requesting notification permission:', error);
-        }
-    }
-
-    // تسجيل الـ subscription
-    async function registerPushSubscription() {
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-            });
-
-            console.log('Push subscription:', subscription);
-
-            // حفظ الـ subscription في قاعدة البيانات
-            if (currentUser) {
-                await savePushSubscription(subscription);
-            }
-        } catch (error) {
-            console.error('Error registering push subscription:', error);
-        }
-    }
-
-    // حفظ الـ subscription في Supabase
-    async function savePushSubscription(subscription) {
-        try {
-            const { error } = await _supabase
-                .from('push_subscriptions')
-                .upsert({
-                    user_id: currentUser.id,
-                    subscription: JSON.stringify(subscription),
-                    created_at: new Date().toISOString()
-                });
-
-            if (error) {
-                console.error('Error saving push subscription:', error);
-            } else {
-                console.log('Push subscription saved');
-            }
-        } catch (error) {
-            console.error('Error saving push subscription:', error);
-        }
-    }
-
-    // تحويل VAPID key من base64 إلى Uint8Array
-    function urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding)
-            .replace(/-/g, '+')
-            .replace(/_/g, '/');
-
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-
-        for (let i = 0; i < rawData.length; ++i) {
-            outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-    }
-
     const POSITIONS = {
         'GK': {t:90, l:50, zone:'D'},
         'LB': {t:72, l:15, zone:'D'}, 'CB1': {t:78, l:35, zone:'D'}, 'CB2': {t:78, l:65, zone:'D'}, 'RB': {t:72, l:85, zone:'D'},
@@ -1126,6 +1079,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
     }
 
     let _verifiedRealtimeChannel = null;
+    let _notificationsRealtimeChannel = null;
 
     async function checkUserSession() {
         try {
@@ -1136,8 +1090,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                 await fetchUserPoints();
                 fetchNotifications();
                 _subscribeVerifiedRealtime(currentUser.id);
-                // طلب إذن الإشعارات
-                requestNotificationPermission();
+                _subscribeNotificationsRealtime(currentUser.id);
             }
             updateAuthUI();
             _supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -1146,10 +1099,15 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                     _supabase.removeChannel(_verifiedRealtimeChannel);
                     _verifiedRealtimeChannel = null;
                 }
+                if (_notificationsRealtimeChannel) {
+                    _supabase.removeChannel(_notificationsRealtimeChannel);
+                    _notificationsRealtimeChannel = null;
+                }
                 if (currentUser) {
                     await fetchUserPoints();
                     fetchNotifications();
                     _subscribeVerifiedRealtime(currentUser.id);
+                    _subscribeNotificationsRealtime(currentUser.id);
                 }
                 updateAuthUI();
                 if(document.getElementById('sec-n').classList.contains('active')) {
@@ -1172,7 +1130,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                     updateAuthUI();
                     const dot = document.getElementById('notif-dot');
                     if (dot) dot.style.display = 'block';
-                    setTimeout(() => { alert('تهانينا! تم توثيق حسابك بنجاح. ستظهر علامة التوثيق ✓ بجانب اسمك في كل مكان.'); }, 500);
+                    setTimeout(() => { alert('🎉 تهانينا! تم توثيق حسابك بنجاح. ستظهر علامة التوثيق ✓ بجانب اسمك في كل مكان.'); }, 500);
                 } else if (newVal === false && oldVal === true) {
                     currentUserIsVerified = false;
                     localStorage.removeItem('is_verified_' + userId);
@@ -1183,6 +1141,19 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                     currentUserFollowing = payload.new.following_count || currentUserFollowing;
                     currentUserUsername = payload.new.username || currentUserUsername;
                 }
+            })
+            .subscribe();
+    }
+
+    function _subscribeNotificationsRealtime(userId) {
+        if (_notificationsRealtimeChannel) return;
+        _notificationsRealtimeChannel = _supabase
+            .channel('notifications-' + userId)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` }, payload => {
+                // إشعار جديد، أظهر النقطة الحمراء
+                const dot = document.getElementById('notif-dot');
+                if (dot) dot.style.display = 'block';
+                // يمكن إضافة إشعار toast هنا إذا أردت
             })
             .subscribe();
     }
@@ -1215,8 +1186,6 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                 if(data.is_verified) localStorage.setItem('is_verified_' + currentUser.id, 'true');
                 else localStorage.removeItem('is_verified_' + currentUser.id);
             } else { currentUserPoints = 0; }
-            // تحديث قائمة المتابعين
-            await loadFollowingSet();
             updateAuthUI();
         } catch(e) { console.log("Profiles:", e.message); }
     }
@@ -1233,12 +1202,29 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                 if(data.length === 0) {
                     list.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--nav-inactive);">لا توجد إشعارات حالياً.</div>';
                 } else {
-                    list.innerHTML = data.map(n => `
-                        <div class="notif-card" style="${n.is_read ? 'border-right-color: var(--nav-inactive); opacity: 0.6;' : ''}">
-                            <b>${n.title}</b>
-                            <span>${n.message}</span>
-                            <small>${new Date(n.created_at).toLocaleString('ar-EG')}</small>
-                        </div>`).join('');
+                    const actorIds = Array.from(new Set(data.map(n => n.actor_id).filter(Boolean)));
+                    const actorProfiles = {};
+                    if (actorIds.length) {
+                        const { data: actors } = await _supabase.from('profiles').select('id, full_name, avatars_url, profile_image').in('id', actorIds);
+                        (actors || []).forEach(a => {
+                            actorProfiles[a.id] = a;
+                        });
+                    }
+                    list.innerHTML = data.map(n => {
+                        const actor = actorProfiles[n.actor_id];
+                        const avatarUrl = actor?.avatars_url || actor?.profile_image || null;
+                        const initials = actor?.full_name ? actor.full_name.substring(0, 2) : '؟';
+                        const avatarHtml = avatarUrl ? `<img src="${avatarUrl}" alt="${actor?.full_name || 'User'}">` : `<div class="notif-avatar-placeholder">${initials}</div>`;
+                        return `
+                        <div class="notif-card ${n.is_read ? 'read' : 'unread'}">
+                            <div class="notif-avatar">${avatarHtml}</div>
+                            <div class="notif-content">
+                                <div class="notif-title-row"><b>${n.title}</b></div>
+                                <span class="notif-message">${n.message}</span>
+                                <small>${new Date(n.created_at).toLocaleString('ar-EG')}</small>
+                            </div>
+                        </div>`;
+                    }).join('');
                 }
             }
         } catch(e) { console.log(e); }
@@ -1267,7 +1253,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             localStorage.setItem('rewarded_prediction_' + matchId + '_' + userId, 'true');
             currentUserPoints = newPts;
             updateAuthUI();
-            alert('مبروك! توقعك لنتيجة المباراة كان صحيحاً. ربحت 10 نقاط!');
+            alert('🎉 مبروك! توقعك لنتيجة المباراة كان صحيحاً. ربحت 10 نقاط!');
         } catch (e) { console.log(e); }
     }
 
@@ -1354,7 +1340,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                                 </div>
                                 ${usernameHtml}
                                 ${verifiedPillHtml}
-                                <span style="background: rgba(241,196,15,0.15); border: 1px solid var(--gold); padding: 3px 10px; border-radius: 20px; color: var(--gold); font-weight: bold; font-size: 0.82rem; margin-top:4px; display:inline-block;"><i class="ph-fill ph-star" style="vertical-align:middle;"></i> ${currentUserPoints} نقطة</span>
+                                <span style="background: rgba(241,196,15,0.15); border: 1px solid var(--gold); padding: 3px 10px; border-radius: 20px; color: var(--gold); font-weight: bold; font-size: 0.82rem; margin-top:4px; display:inline-block;">⭐ ${currentUserPoints} نقطة</span>
                             </div>
                         </div>
                         <div style="display:flex; border-top:1px solid var(--border);">
@@ -1503,7 +1489,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             }
         }
         const statusEl = document.getElementById('photo-status');
-        if (statusEl) statusEl.innerText = 'تم ضبط الصورة، اضغط حفظ للرفع';
+        if (statusEl) statusEl.innerText = '✅ تم ضبط الصورة، اضغط حفظ للرفع';
         document.getElementById('avatar-crop-modal').style.display = 'none';
     }
 
@@ -1517,7 +1503,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         let newPhotoUrl = null;
         const statusEl2 = document.getElementById('photo-status');
         const showStatus = (msg, color) => { if (statusEl2) { statusEl2.style.color = color || 'var(--nav-inactive)'; statusEl2.innerText = msg; } };
-        const showErr = (msg) => { showStatus(msg, '#ff4d4d'); btn.innerText = originalText; btn.disabled = false; };
+        const showErr = (msg) => { showStatus('❌ ' + msg, '#ff4d4d'); btn.innerText = originalText; btn.disabled = false; };
         const nameToSave = (document.getElementById('profile-name-input').value || '').trim();
         const usernameToSave = (document.getElementById('profile-username-input') ? document.getElementById('profile-username-input').value || '' : '').trim().replace(/[^a-zA-Z0-9_\.]/g, '').toLowerCase();
         if (nameToSave) localStorage.setItem('profile_name_' + currentUser.id, nameToSave);
@@ -1559,7 +1545,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                 if (!imgbbUrl) { showErr('فشل رفع الصورة، تحقق من اتصالك بالإنترنت'); return; }
                 newPhotoUrl = imgbbUrl;
                 localStorage.setItem('profile_image_' + currentUser.id, newPhotoUrl);
-                showStatus('تم رفع الصورة بنجاح', '#2ecc71');
+                showStatus('✅ تم رفع الصورة بنجاح', '#2ecc71');
             } catch (uploadErr) { showErr('خطأ: ' + (uploadErr.message || '')); return; }
         }
         btn.innerText = "جاري الحفظ...";
@@ -1582,7 +1568,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         }
         if (saveError) { showErr('فشل الحفظ في قاعدة البيانات: ' + (saveError.message || 'تحقق من اتصالك')); return; }
         btn.innerText = originalText; btn.disabled = false;
-        showStatus('تم الحفظ بنجاح', '#2ecc71');
+        showStatus('✅ تم الحفظ بنجاح', '#2ecc71');
         setTimeout(() => { isProfileEditMode = false; updateAuthUI(); }, 800);
     }
 
@@ -1742,7 +1728,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             await _supabase.from('profiles').update({ points: newPts, has_golden_frame: true }).eq('id', currentUser.id);
             currentUserPoints = newPts;
             localStorage.setItem('has_golden_frame_' + currentUser.id, 'true');
-            alert('مبروك! تم شراء الإطار الذهبي بنجاح.');
+            alert('🎉 مبروك! تم شراء الإطار الذهبي بنجاح.');
             updateAuthUI();
         } catch (e) { alert('حدث خطأ أثناء إتمام عملية الشراء.'); }
     }
@@ -1776,8 +1762,8 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             let randomPts = Math.floor(Math.random() * 49) + 2;
             let newReceiverPts = (receiver.points || 0) + randomPts;
             await _supabase.from('profiles').update({ points: newReceiverPts }).eq('id', receiver.id);
-            await _supabase.from('notifications').insert([{ user_id: receiver.id, title: 'هدية جديدة!', message: `لقد أرسل لك ${myName} هدية بقيمة ${randomPts} نقطة!`, is_read: false }]);
-            alert(`تم إرسال الهدية بنجاح إلى "${receiverStr}"! ربح صديقك ${randomPts} نقطة.`);
+            await _supabase.from('notifications').insert([{ user_id: receiver.id, title: 'هدية جديدة! 🎁', message: `لقد أرسل لك ${myName} هدية بقيمة ${randomPts} نقطة!`, is_read: false }]);
+            alert(`🎁 تم إرسال الهدية بنجاح إلى "${receiverStr}"! ربح صديقك ${randomPts} نقطة.`);
             updateAuthUI(); closeModal('gift-modal');
         } catch (e) {
             alert('حدث خطأ أثناء إرسال الهدية.');
@@ -2006,7 +1992,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             ${avatarHtml}
             <div class="v-comment-content">
                 <div class="v-comment-header">
-                    <span class="v-comment-author" style="${isReply ? 'font-size: 0.85rem;' : ''}; display:flex; align-items:center; gap:4px; cursor:pointer;" onclick="openUserProfile('${authorIdSafe}')">${uName}${verifiedBadge}</span>
+                    <span class="v-comment-author" style="${isReply ? 'font-size: 0.85rem;' : ''}; display:flex; align-items:center; gap:4px;">${uName}${verifiedBadge}</span>
                     <span class="v-comment-time">${timeStr}</span>
                 </div>
                 <div class="v-comment-text" style="${isReply ? 'font-size: 0.85rem;' : ''}">${c.comment}</div>
@@ -2079,7 +2065,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         try {
             const { error } = await _supabase.from('match_comments').insert([{ match_id: activeMatchId, user_id: currentUser.id, user_name: userName, comment: text, likes: 0, dislikes: 0, parent_id: parentId, avatar_url: userAvatarUrl }]);
             if (error) { if(error.message.includes('parent_id')) alert('لتعمل ميزة الردود، يرجى التأكد من إضافة عمود parent_id.'); else alert('حدث خطأ أثناء إرسال الرد.'); return; }
-            if (authorId && authorId !== currentUser.id) sendNotif(authorId, 'رد على تعليقك', `ردّ ${userName} على تعليقك: "${text.substring(0, 40)}${text.length > 40 ? '...' : ''}"`);
+            if (authorId && authorId !== currentUser.id) sendNotif(authorId, '💬 رد على تعليقك', `ردّ ${userName} على تعليقك: "${text.substring(0, 40)}${text.length > 40 ? '...' : ''}"`);
             input.value = '';
             loadComments();
         } catch (e) { alert('حدث خطأ أثناء إرسال الرد.'); }
@@ -2117,11 +2103,11 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             localStorage.setItem(storageKey, 'true');
             if (type === 'likes' && authorId && authorId !== currentUser.id) {
                 const myName = localStorage.getItem('profile_name_' + currentUser.id) || currentUser.email.split('@')[0];
-                sendNotif(authorId, 'إعجاب بتعليقك', `أعجب ${myName} بتعليقك`);
+                sendNotif(authorId, '👍 إعجاب بتعليقك', `أعجب ${myName} بتعليقك`);
             }
         }
         span.textContent = newVal;
-        try { let updates = {}; updates[type] = newVal; await _supabase.from('match_comments').update(updates).eq('id', commentId); } catch(err) { console.log('خطأ في تحديث اللايك:', err); }
+        try { let updates = {}; updates[type] = newVal; await _supabase.from('match_comments').update(updates).eq('id', commentId); } catch(err) {}
     }
 
     let longPressTimer;
@@ -2297,7 +2283,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             const teamToggle = lineupView.querySelector('.team-toggle');
             const banner = document.createElement('div');
             banner.id = 'predicted-lineup-banner'; banner.className = 'predicted-banner';
-            banner.innerHTML = `<h4><i class="ph ph-magic-wand" style="vertical-align:middle;margin-left:5px;"></i> التشكيلة المتوقعة</h4><p>تم توليد هذه التشكيلة تلقائياً بناءً على أكثر اللاعبين مشاركةً في المباريات السابقة لهذا الفريق</p><p style="font-size:12px;opacity:0.7;margin-top:4px;">نوع المباراة: <strong>${predictedLineupFormat} لاعب</strong></p>`;
+            banner.innerHTML = `<h4>🔮 التشكيلة المتوقعة</h4><p>تم توليد هذه التشكيلة تلقائياً بناءً على أكثر اللاعبين مشاركةً في المباريات السابقة لهذا الفريق</p><p style="font-size:12px;opacity:0.7;margin-top:4px;">نوع المباراة: <strong>${predictedLineupFormat} لاعب</strong></p>`;
             if (teamToggle && teamToggle.parentNode) { teamToggle.insertAdjacentElement('afterend', banner); }
             else { lineupView.insertBefore(banner, lineupView.firstChild); }
             await buildPredictedLineup(teamFilter, predictedLineupFormat);
@@ -2308,12 +2294,12 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             const p = item.players; if(!p) return;
             const roles = (item.role || '').toLowerCase();
             let statsIcons = '';
-            if (item.goals > 0) statsIcons += `<div class="pl-badge badge-goal"><i class="ph-fill ph-soccer-ball" style="font-size:9px;"></i>${item.goals>1?item.goals:''}</div>`;
-            if (item.assists > 0) statsIcons += `<div class="pl-badge badge-assist"><i class="ph ph-lightning" style="font-size:9px;color:#1e90ff;"></i>${item.assists>1?item.assists:''}</div>`;
+            if (item.goals > 0) statsIcons += `<div class="pl-badge badge-goal">⚽${item.goals>1?item.goals:''}</div>`;
+            if (item.assists > 0) statsIcons += `<div class="pl-badge badge-assist">👟${item.assists>1?item.assists:''}</div>`;
             if (item.yellow_cards > 0) statsIcons += `<div class="pl-badge badge-card badge-yellow"></div>`;
             if (item.red_card) statsIcons += `<div class="pl-badge badge-card badge-red"></div>`;
             let motmStar = '';
-            if (item['pl-motm'] === true || item['pl-motm'] === 1) motmStar = `<div class="pl-motm-star"><i class="ph-fill ph-star" style="font-size:11px;color:#000;"></i></div>`;
+            if (item['pl-motm'] === true || item['pl-motm'] === 1) motmStar = `<div class="pl-motm-star">⭐</div>`;
             const getHtml = (showRate) => `<div onclick='openDetails(${JSON.stringify(item)})'><div class="pl-img-w">${'<div class="pl-number">'+p.player_number+'</div>'}${motmStar}${statsIcons}<img src="${p.player_image}">${showRate ? `<div class="pl-rate" style="${getRatingStyle(item.rating || '6.0')}">${item.rating || '6.0'}</div>` : ''}</div><span class="pl-name">${p.player_name}</span></div>`;
             if(roles.includes('co')) coach.innerHTML = `<div onclick='openDetails(${JSON.stringify(item)})' style="display:flex; align-items:center; gap:15px; width:100%; cursor:pointer;"><img src="${p.player_image}" width="50" style="border-radius:50%;"><div><small>المدرب</small><br><b>${p.player_name}</b></div></div>`;
             else if (roles.includes('ev') || roles.includes('inf')) { document.getElementById('bench-absent-area').style.display='block'; absentGrid.innerHTML += getHtml(false); }
@@ -2339,20 +2325,20 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         data.forEach(item => {
             const name = item.players?.player_name || '---'; const img = item.players?.player_image || ''; const num = item.players?.player_number || ''; const team = item.team_name || '';
             const push = (icon, label, count) => { for (let i = 0; i < (count || 1); i++) events.push({ icon, label, name, img, num, team }); };
-            if (item['pl-motm'] === true || item['pl-motm'] === 1) push('<i class="ph-fill ph-star" style="color:#f1c40f;"></i>', 'رجل المباراة', 1);
-            if ((item.goals || 0) > 0) push('<i class="ph-fill ph-soccer-ball" style="color:#2ecc71;"></i>', 'هدف', item.goals);
-            if ((item.assists || 0) > 0) push('<i class="ph ph-lightning" style="color:#1e90ff;"></i>', 'صناعة هدف', item.assists);
-            if ((item.yellow_cards || 0) > 0) push('<i class="ph-fill ph-card" style="color:#f1c40f;"></i>', 'بطاقة صفراء', item.yellow_cards);
-            if (item.red_card) push('<i class="ph-fill ph-card" style="color:#e74c3c;"></i>', 'بطاقة حمراء', 1);
-            if (item.is_injured) push('<i class="ph ph-first-aid-kit" style="color:#e74c3c;"></i>', 'إصابة', 1);
+            if (item['pl-motm'] === true || item['pl-motm'] === 1) push('⭐', 'رجل المباراة', 1);
+            if ((item.goals || 0) > 0) push('⚽', 'هدف', item.goals);
+            if ((item.assists || 0) > 0) push('👟', 'صناعة هدف', item.assists);
+            if ((item.yellow_cards || 0) > 0) push('🟨', 'بطاقة صفراء', item.yellow_cards);
+            if (item.red_card) push('🟥', 'بطاقة حمراء', 1);
+            if (item.is_injured) push('🤕', 'إصابة', 1);
         });
         if (events.length === 0) { list.innerHTML = `<div style="text-align:center;padding:60px;color:#8e99a2;">لا توجد أحداث مسجّلة.</div>`; return; }
-        const order = ['ph-star','ph-soccer-ball','ph-lightning','ph-card yellow','ph-card red','ph-first-aid-kit'];
-        events.sort((a, b) => order.findIndex(k => a.icon.includes(k)) - order.findIndex(k => b.icon.includes(k)));
+        const order = ['⭐','⚽','👟','🟨','🟥','🤕'];
+        events.sort((a, b) => order.indexOf(a.icon) - order.indexOf(b.icon));
         list.innerHTML = events.map(ev => `
             <div style="display:flex; align-items:center; padding:12px 15px; border-bottom:1px solid var(--border); gap:12px;">
                 <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;flex-shrink:0;border:2px solid var(--accent);"><img src="${ev.img}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://via.placeholder.com/36/162029/1e90ff?text=${ev.num}'"></div>
-                <div style="font-size:1.4rem; flex-shrink:0; display:flex; align-items:center;">${ev.icon}</div>
+                <div style="font-size:1.4rem; flex-shrink:0;">${ev.icon}</div>
                 <div style="flex:1;"><b style="font-size:0.95rem;">${ev.name}</b><br><small style="color:#8e99a2;">${ev.label} · ${ev.team}</small></div>
             </div>`).join('');
     }
@@ -2452,7 +2438,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
 
     async function loadNews() {
         // تحميل الستوريات أولاً
-        loadStories(); updateNotificationBadge();
+        loadStories();
         const newsListEl = document.getElementById('news-list');
         newsListEl.innerHTML = Array(3).fill(0).map(() => `<div style="background:var(--card); margin-bottom:15px; border-radius:12px; overflow:hidden; border: 1px solid var(--border);"><div class="skeleton-rect" style="width:100%;height:200px;border-radius:0;"></div><div style="padding:15px;"><div class="skeleton-line" style="width:80%;"></div><div class="skeleton-line" style="width:50%;height:10px;"></div></div></div>`).join('');
         const { data } = await _supabase.from('news').select('*').order('created_at', {ascending: false});
@@ -2546,19 +2532,21 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         try {
             const { data, error } = await _supabase.from('profiles').select('id, full_name, username, avatars_url, profile_image, points, is_verified, followers_count').or(`full_name.ilike.%${q}%,username.ilike.%${q}%`).limit(30);
             if (error || !data || data.length === 0) {
-                container.innerHTML = `<div class="search-empty"><div style="font-size:2rem;margin-bottom:10px;"><i class="ph ph-magnifying-glass" style="font-size:2rem;color:var(--nav-inactive);"></i></div><div>لا توجد نتائج لـ "${q}"</div></div>`;
+                container.innerHTML = `<div class="search-empty"><div style="font-size:2rem;margin-bottom:10px;">🔍</div><div>لا توجد نتائج لـ "${q}"</div></div>`;
                 return;
             }
             container.innerHTML = data.map(u => {
                 const initials = (u.full_name || '؟').substring(0, 2);
                 const avatarUrl = u.avatars_url || u.profile_image;
+                const hasStory = window._usersWithStories && window._usersWithStories.has(u.id);
                 const avHtml = avatarUrl ? `<img class="search-result-avatar" src="${avatarUrl}" onerror="this.outerHTML='<div class=search-result-initials>${initials}</div>'">` : `<div class="search-result-initials">${initials}</div>`;
+                const wrappedAv = `<div class="avatar-wrapper ${hasStory ? 'has-story' : ''}" onclick="handleAvatarClick('${u.id}', event)">${avHtml}</div>`;
                 const verifiedBadge = u.is_verified ? `<span class="verified-badge"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>` : '';
                 const isOwnProfile = currentUser && u.id === currentUser.id;
                 const isFollowing = _followingSet.has(u.id);
                 const followBtnHtml = isOwnProfile ? '' : `<button class="search-follow-btn ${isFollowing ? 'following' : ''}" id="sfb-${u.id}" onclick="event.stopPropagation(); quickFollow('${u.id}', this)">${isFollowing ? 'متابَع ✓' : 'متابعة'}</button>`;
-                const usernameRow = u.username ? `<div class="search-result-meta" style="direction:ltr;text-align:right;">@${u.username} · ${u.followers_count || 0} متابع</div>` : `<div class="search-result-meta">${u.followers_count || 0} متابع · <i class="ph-fill ph-star" style="color:#f1c40f;font-size:0.85rem;vertical-align:middle;"></i> ${u.points || 0} نقطة</div>`;
-                return `<div class="search-result-item" onclick="openUserProfile('${u.id}')">${avHtml}<div class="search-result-info"><div class="search-result-name">${u.full_name || 'مستخدم'}${verifiedBadge}</div>${usernameRow}</div>${followBtnHtml}</div>`;
+                const usernameRow = u.username ? `<div class="search-result-meta" style="direction:ltr;text-align:right;">@${u.username} · ${u.followers_count || 0} متابع</div>` : `<div class="search-result-meta">${u.followers_count || 0} متابع · ⭐ ${u.points || 0} نقطة</div>`;
+                return `<div class="search-result-item" onclick="openUserProfile('${u.id}')">${wrappedAv}<div class="search-result-info"><div class="search-result-name">${u.full_name || 'مستخدم'}${verifiedBadge}</div>${usernameRow}</div>${followBtnHtml}</div>`;
             }).join('');
         } catch(e) { container.innerHTML = '<div class="search-empty">حدث خطأ أثناء البحث.</div>'; }
     }
@@ -2597,7 +2585,18 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
 
     async function sendNotif(targetUserId, title, message) {
         if (!targetUserId || !currentUser) return;
-        try { await _supabase.from('notifications').insert([{ user_id: targetUserId, title, message, is_read: false }]); } catch(e) {}
+        try {
+            const { error } = await _supabase.from('notifications').insert([{ user_id: targetUserId, title, message, is_read: false }]);
+            if (error) {
+                console.log('Notification error:', error.message);
+                // إذا كان خطأ RLS، أظهر رسالة للمطور
+                if (error.message.includes('policy') || error.message.includes('RLS')) {
+                    console.log('RLS error for notifications table. Please check Supabase policies.');
+                }
+            }
+        } catch(e) {
+            console.log('Send notification failed:', e.message);
+        }
     }
 
     async function openUserProfile(userId) {
@@ -2690,13 +2689,15 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             body.innerHTML = profiles.map(u => {
                 const initials = (u.full_name || '؟').substring(0, 2);
                 const avatarUrl = u.avatars_url || u.profile_image;
+                const hasStory = window._usersWithStories && window._usersWithStories.has(u.id);
                 const avHtml = avatarUrl ? `<img class="follow-item-av" src="${avatarUrl}" onerror="this.outerHTML='<div class=follow-item-av-text>${initials}</div>'">` : `<div class="follow-item-av-text">${initials}</div>`;
+                const wrappedAv = `<div class="avatar-wrapper follow ${hasStory ? 'has-story' : ''}" onclick="handleAvatarClick('${u.id}', event)">${avHtml}</div>`;
                 const verifiedBadge = u.is_verified ? `<span class="verified-badge"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg></span>` : '';
                 const isFollowing = _followingSet.has(u.id);
                 const isOwn = currentUser && u.id === currentUser.id;
                 const followBtn = !isOwn && currentUser ? `<button class="search-follow-btn ${isFollowing ? 'following' : ''}" onclick="event.stopPropagation(); quickFollow('${u.id}', this)">${isFollowing ? 'متابَع ✓' : 'متابعة'}</button>` : '';
                 return `<div class="follow-list-item" onclick="closeModal('follow-list-modal'); setTimeout(()=>openUserProfile('${u.id}'),200)">
-                    ${avHtml}
+                    ${wrappedAv}
                     <div class="follow-item-info">
                         <div class="follow-item-name">${u.full_name || 'مستخدم'}${verifiedBadge}</div>
                         <div class="follow-item-meta">${u.username ? '@' + u.username + ' · ' : ''}${u.followers_count || 0} متابع</div>
@@ -2923,7 +2924,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
                 }
             } else {
                 closeStoryEditor();
-                loadStories(); updateNotificationBadge();
+                loadStories();
                 _showStorySuccessToast();
             }
         } catch(err) {
@@ -2936,7 +2937,7 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
     function _showStorySuccessToast() {
         const toast = document.createElement('div');
         toast.style.cssText = 'position:fixed;bottom:110px;left:50%;transform:translateX(-50%);background:#2ecc71;color:white;padding:12px 24px;border-radius:25px;font-weight:bold;font-size:0.95rem;z-index:9999;box-shadow:0 4px 20px rgba(46,204,113,0.5);animation:slideIn 0.3s ease-out;';
-        toast.innerHTML = '<i class="ph ph-check-circle" style="font-size:1.1rem;vertical-align:middle;margin-left:6px;"></i> تم نشر الستوري بنجاح!';
+        toast.textContent = '✅ تم نشر الستوري بنجاح!';
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
     }
@@ -2946,9 +2947,9 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
         if (navigator.clipboard) {
             navigator.clipboard.writeText(sql).then(() => {
                 const btn = document.getElementById('rls-copy-btn');
-                btn.innerHTML = '<i class="ph ph-check-circle" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> تم النسخ!';
+                btn.textContent = '✅ تم النسخ!';
                 btn.style.background = '#2ecc71';
-                setTimeout(() => { btn.innerHTML = '<i class="ph ph-clipboard-text" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> نسخ الكود'; btn.style.background = '#1e90ff'; }, 2500);
+                setTimeout(() => { btn.textContent = '📋 نسخ الكود'; btn.style.background = '#1e90ff'; }, 2500);
             });
         } else {
             const ta = document.createElement('textarea');
@@ -2956,110 +2957,13 @@ ALTER TABLE story_likes DISABLE ROW LEVEL SECURITY;</div>
             document.body.appendChild(ta); ta.select();
             document.execCommand('copy'); document.body.removeChild(ta);
             const btn = document.getElementById('rls-copy-btn');
-            btn.innerHTML = '<i class="ph ph-check-circle" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> تم النسخ!'; btn.style.background = '#2ecc71';
-            setTimeout(() => { btn.innerHTML = '<i class="ph ph-clipboard-text" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> نسخ الكود'; btn.style.background = '#1e90ff'; }, 2500);
+            btn.textContent = '✅ تم النسخ!'; btn.style.background = '#2ecc71';
+            setTimeout(() => { btn.textContent = '📋 نسخ الكود'; btn.style.background = '#1e90ff'; }, 2500);
         }
     }
 
     // تحميل شريط الستوري
-    
-    // دالة لجلب عدد الإشعارات غير المقروءة
-    async function updateNotificationBadge() {
-        if (!currentUser) return;
-        try {
-            const { count, error } = await _supabase
-                .from('notifications')
-                .select('*', { count: 'exact', head: true })
-                .eq('user_id', currentUser.id)
-                .eq('is_read', false);
-
-            const badge = document.getElementById('notif-badge'); // تأكد من وجود هذا الـ ID في الـ HTML
-            if (badge) {
-                if (count > 0) {
-                    badge.textContent = count > 9 ? '+9' : count;
-                    badge.style.display = 'flex';
-                } else {
-                    badge.style.display = 'none';
-                }
-            }
-        } catch (e) {
-            console.log('Error updating badge:', e.message);
-        }
-    }
-
-    // دالة لفتح قائمة الإشعارات وعرضها
-    async function openNotifications() {
-        if (!currentUser) { openAuthModal(); return; }
-        const modal = document.getElementById('notifications-modal');
-        const list = document.getElementById('notifications-list');
-        if (!modal || !list) return;
-
-        modal.style.display = 'flex';
-        history.pushState({ modal: 'notifications-modal' }, '');
-        list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--nav-inactive);">جاري تحميل الإشعارات...</div>';
-
-        try {
-            const { data, error } = await _supabase
-                .from('notifications')
-                .select('*')
-                .eq('user_id', currentUser.id)
-                .order('created_at', { ascending: false })
-                .limit(30);
-
-            if (error) throw error;
-
-            if (!data || data.length === 0) {
-                list.innerHTML = '<div style="text-align:center;padding:50px;color:var(--nav-inactive);"><i class="ph ph-bell-slash" style="font-size:2rem;display:block;margin-bottom:10px;"></i>لا توجد إشعارات حالياً</div>';
-                return;
-            }
-
-            list.innerHTML = data.map(n => {
-                const timeStr = _getRelativeTime(n.created_at);
-                const dot = !n.is_read ? '<div style="width:8px;height:8px;background:var(--accent);border-radius:50%;"></div>' : '';
-                return `
-                    <div class="notif-item ${n.is_read ? '' : 'unread'}" style="display:flex;align-items:center;gap:12px;padding:15px;border-bottom:1px solid var(--border);cursor:pointer;background:${n.is_read ? 'transparent' : 'rgba(30,144,255,0.05)'};" onclick="markNotifRead('${n.id}');">
-                        <div style="width:45px;height:45px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                            <i class="${_getNotifIcon(n.type)}" style="font-size:1.4rem;color:var(--accent);"></i>
-                        </div>
-                        <div style="flex:1;">
-                            <div style="font-weight:bold;font-size:0.9rem;color:var(--text);">${n.title}</div>
-                            <div style="font-size:0.85rem;color:var(--nav-inactive);margin-top:3px;">${n.content}</div>
-                            <div style="font-size:0.75rem;color:var(--nav-inactive);margin-top:5px;">${timeStr}</div>
-                        </div>
-                        ${dot}
-                    </div>
-                `;
-            }).join('');
-
-            // تحديث الإشعارات كمقروءة في قاعدة البيانات
-            await _supabase.from('notifications').update({ is_read: true }).eq('user_id', currentUser.id);
-            setTimeout(updateNotificationBadge, 2000);
-
-        } catch (e) {
-            list.innerHTML = '<div style="text-align:center;padding:30px;color:#ff4d4d;">خطأ في تحميل الإشعارات</div>';
-        }
-    }
-
-    function _getNotifIcon(type) {
-        if (type.includes('لايك') || type.includes('أعجب')) return 'ph ph-heart';
-        if (type.includes('متابعة')) return 'ph ph-user-plus';
-        if (type.includes('تعليق') || type.includes('رد')) return 'ph ph-chat-circle-text';
-        return 'ph ph-bell';
-    }
-
-    function _getRelativeTime(date) {
-        const diff = Math.floor((new Date() - new Date(date)) / 60000);
-        if (diff < 1) return 'الآن';
-        if (diff < 60) return `منذ ${diff} دقيقة`;
-        if (diff < 1440) return `منذ ${Math.floor(diff/60)} ساعة`;
-        return `منذ ${Math.floor(diff/1440)} يوم`;
-    }
-
-    async function markNotifRead(id) {
-        // يمكن إضافة منطق للانتقال للمنشور المعني هنا
-    }
-
-async function loadStories() {
+    async function loadStories() {
         const bar = document.getElementById('stories-bar');
         if (!bar) return;
         bar.innerHTML = '';
@@ -3086,8 +2990,10 @@ async function loadStories() {
             if (error || !stories || stories.length === 0) {
                 // إظهار زر الإضافة فقط إذا كان المستخدم مسجلاً
                 if (currentUser) {
+                    const myAvatar = localStorage.getItem('profile_image_' + currentUser.id) || null;
+                    const myName = localStorage.getItem('profile_name_' + currentUser.id) || 'أنت';
                     bar.style.display = 'flex';
-                    bar.innerHTML = _buildAddStoryCircle();
+                    bar.innerHTML = _buildAddStoryCircle(myAvatar, myName);
                 } else {
                     bar.style.display = 'none';
                 }
@@ -3114,7 +3020,7 @@ async function loadStories() {
             if (currentUser) {
                 const myStories = grouped[currentUser.id];
                 const myProfile = profileMap[currentUser.id];
-                const myAvatar = myProfile?.avatars_url || myProfile?.profile_image || null;
+                const myAvatar = myProfile?.avatars_url || myProfile?.profile_image || localStorage.getItem('profile_image_' + currentUser.id) || null;
                 const myName = localStorage.getItem('profile_name_' + currentUser.id) || 'أنت';
                 if (myStories && myStories.length > 0) {
                     const initials = myName.substring(0, 2);
@@ -3138,9 +3044,10 @@ async function loadStories() {
                 const name = prof?.full_name || 'مستخدم';
                 const avatar = prof?.avatars_url || prof?.profile_image || null;
                 const initials = name.substring(0, 2);
-                const hasSeen = userStories.some(st => localStorage.getItem(`story_seen_${uid}_${st.id}`));
+                const seenKey = `story_seen_${uid}`;
+                const isSeen = localStorage.getItem(seenKey);
                 html += `<div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
-                    <div class="story-avatar-ring ${hasSeen ? 'seen' : ''}">
+                    <div class="story-avatar-ring ${isSeen ? 'seen' : ''}">
                         <div class="story-avatar-inner">
                             ${avatar ? `<img src="${avatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1rem;">${initials}</span>`}
                         </div>
@@ -3155,6 +3062,7 @@ async function loadStories() {
             // تخزين بيانات الستوريات للعارض
             window._storiesData = grouped;
             window._storiesProfiles = profileMap;
+            window._usersWithStories = new Set(Object.keys(grouped));
 
         } catch(e) {
             console.log('Stories error:', e.message);
@@ -3169,7 +3077,7 @@ async function loadStories() {
         return `<div class="story-circle" onclick="openStoryEditor()">
             <div class="story-avatar-ring own-add">
                 <div class="story-avatar-inner">
-                    ${avatar ? `<img src="${avatar}" alt="">` : `<span style="color:var(--accent);font-size:1.5rem;font-weight:900;">+</span>`}
+                    ${avatar ? `<img src="${avatar}" alt="">` : `<span style="color:white;font-size:1.1rem;font-weight:900;">${initials}</span>`}
                 </div>
                 <div class="story-add-plus">+</div>
             </div>
@@ -3182,6 +3090,29 @@ async function loadStories() {
         const allUsers = Object.keys(window._storiesData);
         const userIndex = allUsers.indexOf(userId);
         openStoryViewer(allUsers, userIndex, 0);
+    }
+
+    let avatarClickCounts = {};
+    function handleAvatarClick(userId, event) {
+        event.stopPropagation(); // منع الـ onclick الأب
+        if (!avatarClickCounts[userId]) avatarClickCounts[userId] = 0;
+        avatarClickCounts[userId]++;
+        if (avatarClickCounts[userId] === 1) {
+            setTimeout(() => {
+                if (avatarClickCounts[userId] === 1) {
+                    // ضغطة واحدة: افتح الستوري إذا موجود، وإلا البروفايل
+                    if (window._usersWithStories && window._usersWithStories.has(userId)) {
+                        _openStoryViewerForUser(userId);
+                    } else {
+                        openUserProfile(userId);
+                    }
+                } else {
+                    // ضغطتان: اذهب إلى البروفايل
+                    openUserProfile(userId);
+                }
+                avatarClickCounts[userId] = 0;
+            }, 300);
+        }
     }
 
     function openStoryViewer(userIds, userIndex, storyIndex) {
@@ -3252,16 +3183,16 @@ async function loadStories() {
         // زر الحذف والمشاهدات — يظهران فقط لصاحب الستوري
         const delBtn = document.getElementById('sv-delete-btn');
         const viewsCount = document.getElementById('sv-views-count');
-        const likeBtn = document.getElementById('sv-like-btn');
+        const addBtn = document.getElementById('sv-add-btn');
         if (delBtn) delBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
         if (viewsCount) viewsCount.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
-        if (likeBtn) {
-            likeBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'none' : 'flex';
-            _updateStoryLikeButton(story);
-        }
+        if (addBtn) addBtn.style.display = (currentUser && currentUser.id === story.user_id) ? 'flex' : 'none';
 
         // تسجيل المشاهدة وجلب العدد
         _recordAndShowStoryViews(story);
+
+        // جلب عدد القلوب وحالة القلب
+        _recordAndShowStoryHearts(story);
 
         _svTimer = setTimeout(() => svNext(), 5200);
     }
@@ -3277,21 +3208,33 @@ async function loadStories() {
 
     async function _recordAndShowStoryViews(story) {
         const viewerId = _getStoryViewerId();
-        const seenKey = `story_seen_${story.user_id}_${story.id}`;
+        const seenKey = `sv_${story.id}_${viewerId}`;
         const viewsEl = document.getElementById('sv-views-num');
-        // تسجيل المشاهدة في localStorage كمشاهدة على مستوى المستخدم
+        // تسجيل المشاهدة في localStorage
+        const alreadySeen = localStorage.getItem(seenKey);
         localStorage.setItem(seenKey, '1');
+        // تسجيل أن المستخدم تم مشاهدته
+        localStorage.setItem(`story_seen_${story.user_id}`, '1');
+
+        // تحديث الدائرة لتصبح مشاهدة فوراً
+        const circles = document.querySelectorAll('.story-circle');
+        circles.forEach(circle => {
+            if (circle.onclick && circle.onclick.toString().includes(`'${story.user_id}'`)) {
+                const ring = circle.querySelector('.story-avatar-ring');
+                if (ring) ring.classList.add('seen');
+            }
+        });
 
         // محاولة تسجيل في Supabase (story_views)
-        if (!localStorage.getItem(`story_view_recorded_${story.id}_${viewerId}`)) {
+        if (!alreadySeen) {
             try {
                 const { error } = await _supabase.from('story_views').upsert(
                     [{ story_id: story.id, viewer_id: viewerId }],
                     { onConflict: ['story_id', 'viewer_id'], ignoreDuplicates: true }
                 );
-                localStorage.setItem(`story_view_recorded_${story.id}_${viewerId}`, '1');
                 if (error) {
                     console.log('Story views error:', error.message);
+                    // إذا كان الجدول غير موجود، نحاول تنبيه المستخدم لصاحب الستوري
                     if (error.message.includes('does not exist') || error.code === '42P01') {
                         _showStoryViewsSetupError();
                     }
@@ -3327,90 +3270,53 @@ async function loadStories() {
         window._currentStoryViewing = story;
     }
 
-    function _storyLikeStorageKey(story) {
-        const viewerId = _getStoryViewerId();
-        return `story_like_${story.id}_${viewerId}`;
-    }
+    async function _recordAndShowStoryHearts(story) {
+        const userId = currentUser?.id;
+        if (!userId || userId === story.user_id) {
+            // إخفاء زر القلب للمستخدمين غير المسجلين أو لستورياتهم الخاصة
+            document.getElementById('sv-heart-btn').style.display = 'none';
+            return;
+        }
+        document.getElementById('sv-heart-btn').style.display = 'flex';
 
-    async function _fetchStoryLikeStatus(story) {
-        const key = _storyLikeStorageKey(story);
-        let liked = localStorage.getItem(key) === '1';
+        const heartsEl = document.getElementById('sv-hearts-num');
+        const heartIcon = document.getElementById('sv-heart-icon');
+
+        // جلب عدد القلوب
         try {
-            const viewerId = _getStoryViewerId();
-            const { count, error } = await _supabase.from('story_likes')
+            const { count, error } = await _supabase.from('story_hearts')
                 .select('*', { count: 'exact', head: true })
-                .eq('story_id', story.id)
-                .eq('viewer_id', viewerId);
-            if (!error && count !== null) {
-                liked = count > 0;
+                .eq('story_id', story.id);
+
+            if (error) {
+                console.log('Story hearts count error:', error.message);
+                if (heartsEl) heartsEl.textContent = '0';
+            } else {
+                if (heartsEl && count !== null) heartsEl.textContent = count;
             }
-        } catch (e) {
-            console.log('Story like status fetch failed:', e.message);
+        } catch(e) {
+            console.log('Story hearts count failed:', e.message);
+            if (heartsEl) heartsEl.textContent = '0';
         }
-        if (liked) localStorage.setItem(key, '1');
-        else localStorage.removeItem(key);
-        return liked;
-    }
 
-    async function _updateStoryLikeButton(story) {
-        const likeBtn = document.getElementById('sv-like-btn');
-        if (!likeBtn || !story) return;
-        const liked = await _fetchStoryLikeStatus(story);
-        likeBtn.innerHTML = liked ? '<i class="ph-fill ph-heart" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;color:#ff4d4d;"></i> معجب' : '<i class="ph ph-heart" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> أعجبني';
-        likeBtn.classList.toggle('active', liked);
-    }
-
-    async function toggleStoryLike() {
-        const story = window._currentStoryViewing;
-        if (!story) return;
-        const likeBtn = document.getElementById('sv-like-btn');
-        const key = _storyLikeStorageKey(story);
-        const currentlyLiked = localStorage.getItem(key) === '1';
-        if (likeBtn) likeBtn.disabled = true;
-
+        // التحقق إذا وضع المستخدم قلب
         try {
-            const viewerId = _getStoryViewerId();
-            if (!currentlyLiked) {
-                const { error } = await _supabase.from('story_likes').insert([
-                    { story_id: story.id, viewer_id: viewerId }
-                ]);
-                if (error) throw error;
-                localStorage.setItem(key, '1');
-                if (story.user_id && currentUser && story.user_id !== currentUser.id) {
-                    const myName = localStorage.getItem('profile_name_' + currentUser.id) || currentUser.email?.split('@')[0] || 'مستخدم';
-                    sendNotif(story.user_id, 'أعجبك ستوري', `أعجب ${myName} بستوريك.`);
-                }
-            } else {
-                const { error } = await _supabase.from('story_likes')
-                    .delete()
-                    .eq('story_id', story.id)
-                    .eq('viewer_id', viewerId);
-                if (error) throw error;
-                localStorage.removeItem(key);
-            }
-        } catch (e) {
-            console.log('Story like save failed:', e?.message || e);
-            const isMissingTable = (e?.message && e.message.includes('does not exist')) || e?.code === '42P01';
-            if (isMissingTable) {
-                if (!currentlyLiked) localStorage.setItem(key, '1');
-                else localStorage.removeItem(key);
-                _showStoryLikesSetupError();
-            } else {
-                if (currentlyLiked) localStorage.removeItem(key);
-                else localStorage.setItem(key, '1');
-            }
-        } finally {
-            if (likeBtn) likeBtn.disabled = false;
-            _updateStoryLikeButton(story);
-        }
-    }
+            const { data, error } = await _supabase.from('story_hearts')
+                .select('id')
+                .eq('story_id', story.id)
+                .eq('user_id', userId)
+                .maybeSingle();
 
-    function _showStoryLikesSetupError() {
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:#ff6b35;color:white;padding:12px 20px;border-radius:25px;font-weight:bold;font-size:0.9rem;z-index:9999;max-width:300px;text-align:center;animation:slideIn 0.3s ease-out;';
-        toast.innerHTML = '<i class="ph ph-warning" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> تحتاج إعداد جدول إعجابات الستوري. افتح نافذة الإصلاح في Supabase والصق الكود المضاف.';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 5000);
+            if (error) {
+                console.log('Story heart check error:', error.message);
+                heartIcon.textContent = '🤍';
+            } else {
+                heartIcon.textContent = data ? '❤️' : '🤍';
+            }
+        } catch(e) {
+            console.log('Story heart check failed:', e.message);
+            heartIcon.textContent = '🤍';
+        }
     }
 
     function _showStoryViewsSetupError() {
@@ -3418,7 +3324,7 @@ async function loadStories() {
         if (currentUser && window._currentStoryViewing && currentUser.id === window._currentStoryViewing.user_id) {
             const toast = document.createElement('div');
             toast.style.cssText = 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);background:#ff6b35;color:white;padding:12px 20px;border-radius:25px;font-weight:bold;font-size:0.9rem;z-index:9999;max-width:300px;text-align:center;animation:slideIn 0.3s ease-out;';
-            toast.innerHTML = '<i class="ph ph-warning" style="font-size:1.1rem;vertical-align:middle;margin-left:5px;"></i> تحتاج إعداد جدول المشاهدات. اذهب إلى Supabase → SQL Editor والصق الكود من نافذة الإصلاح';
+            toast.textContent = '⚠️ تحتاج إعداد جداول الستوري والإشعارات. اذهب إلى Supabase → SQL Editor والصق الكود من نافذة الإصلاح';
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 5000);
         }
@@ -3446,7 +3352,7 @@ async function loadStories() {
             if (error) {
                 console.log('Story viewers error:', error.message);
                 if (error.message.includes('does not exist') || error.code === '42P01') {
-                    list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;"><i class="ph ph-x-circle" style="font-size:1.3rem;vertical-align:middle;margin-left:5px;"></i> جدول المشاهدات غير موجود<br><br>اذهب إلى Supabase → SQL Editor والصق الكود من نافذة الإصلاح لإنشاء الجدول</div>';
+                    list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">❌ جدول المشاهدات غير موجود<br><br>اذهب إلى Supabase → SQL Editor والصق الكود من نافذة الإصلاح لإنشاء الجدول</div>';
                 } else {
                     list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">حدث خطأ في تحميل المشاهدين</div>';
                 }
@@ -3474,6 +3380,17 @@ async function loadStories() {
             const profileMap = {};
             (profiles || []).forEach(p => profileMap[p.id] = p);
 
+            // جلب من وضع قلوب
+            const { data: hearts, error: heartsError } = await _supabase
+                .from('story_hearts')
+                .select('user_id')
+                .eq('story_id', story.id);
+
+            const heartsMap = {};
+            if (!heartsError && hearts) {
+                hearts.forEach(h => heartsMap[h.user_id] = true);
+            }
+
             // بناء قائمة المشاهدين
             list.innerHTML = views.map(v => {
                 const prof = profileMap[v.viewer_id];
@@ -3491,6 +3408,10 @@ async function loadStories() {
                 else if(timeDiff > 3600) timeStr = `منذ ${Math.floor(timeDiff/3600)} ساعة`;
                 else if(timeDiff > 60) timeStr = `منذ ${Math.floor(timeDiff/60)} دقيقة`;
 
+                const hasHeart = heartsMap[v.viewer_id];
+                const actionIcon = hasHeart ? '❤️' : '👁️';
+                const actionText = hasHeart ? 'وضع قلب' : 'شاهد';
+
                 return `
                     <div style="display:flex;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.2s;" onclick="closeModal('story-viewers-modal'); openUserProfile('${prof.id}'); event.stopPropagation();">
                         ${avHtml}
@@ -3498,7 +3419,7 @@ async function loadStories() {
                             <div style="font-weight:bold;font-size:0.95rem;color:var(--text);">${prof.full_name || 'مستخدم'}</div>
                             <div style="color:var(--nav-inactive);font-size:0.8rem;margin-top:2px;">${prof.username ? '@' + prof.username + ' · ' : ''}${timeStr}</div>
                         </div>
-                        <div style="color:var(--nav-inactive);font-size:0.75rem;"><i class="ph ph-eye" style="font-size:0.9rem;vertical-align:middle;margin-left:3px;"></i> شاهد</div>
+                        <div style="color:var(--nav-inactive);font-size:0.75rem;">${actionIcon} ${actionText}</div>
                     </div>
                 `;
             }).join('');
@@ -3506,6 +3427,61 @@ async function loadStories() {
         } catch(e) {
             console.log('Story viewers load failed:', e.message);
             list.innerHTML = '<div style="text-align:center;padding:60px;color:#ff4d4d;">حدث خطأ أثناء تحميل المشاهدين</div>';
+        }
+    }
+
+    async function toggleStoryHeart() {
+        if (!currentUser) { openAuthModal(); return; }
+        if (!window._currentStoryViewing) return;
+
+        const story = window._currentStoryViewing;
+        const userId = currentUser.id;
+        const heartIcon = document.getElementById('sv-heart-icon');
+        const heartsEl = document.getElementById('sv-hearts-num');
+
+        const isHearted = heartIcon.textContent === '❤️';
+
+        try {
+            if (isHearted) {
+                // إزالة القلب
+                const { error } = await _supabase.from('story_hearts')
+                    .delete()
+                    .eq('story_id', story.id)
+                    .eq('user_id', userId);
+
+                if (error) {
+                    console.log('Remove heart error:', error.message);
+                    return;
+                }
+
+                heartIcon.textContent = '🤍';
+                heartsEl.textContent = Math.max(0, parseInt(heartsEl.textContent) - 1);
+            } else {
+                // إضافة قلب
+                const { error } = await _supabase.from('story_hearts')
+                    .insert([{ story_id: story.id, user_id: userId }]);
+
+                if (error) {
+                    console.log('Add heart error:', error.message);
+                    return;
+                }
+
+                heartIcon.textContent = '❤️';
+                heartsEl.textContent = parseInt(heartsEl.textContent) + 1;
+
+                // إرسال إشعار لصاحب الستوري إذا لم يكن هو نفسه
+                if (story.user_id !== userId) {
+                    const { data: profile } = await _supabase.from('profiles').select('full_name').eq('id', userId).maybeSingle();
+                    const likerName = profile?.full_name || 'مستخدم';
+                    await _supabase.from('notifications').insert([{
+                        user_id: story.user_id,
+                        title: 'قلب على ستوريك',
+                        message: `${likerName} وضع قلب على ستوريك!`
+                    }]);
+                }
+            }
+        } catch(e) {
+            console.log('Toggle heart failed:', e.message);
         }
     }
 
@@ -3518,7 +3494,7 @@ async function loadStories() {
         const { error } = await _supabase.from('stories').delete().eq('id', story.id);
         if (error) { alert('فشل الحذف: ' + error.message); return; }
         closeStoryViewer();
-        loadStories(); updateNotificationBadge();
+        loadStories();
     }
 
     function svNext() {
@@ -3555,7 +3531,7 @@ async function loadStories() {
         if (_svTimer) clearTimeout(_svTimer);
         document.getElementById('story-viewer-modal').style.display = 'none';
         if (history.state && history.state.modal === 'story-viewer-modal') history.back();
-        loadStories(); updateNotificationBadge();
+        loadStories();
     }
 
     // ========================================================
