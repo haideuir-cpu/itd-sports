@@ -25,6 +25,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;700;900&family=Readex+Pro:wght@400;700&family=Reem+Kufi:wght@400;700&family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { 
@@ -454,6 +455,45 @@
         .follow-item-name { font-weight: bold; font-size: 0.95rem; display: flex; align-items: center; gap: 4px; }
         .follow-item-meta { color: var(--nav-inactive); font-size: 0.8rem; margin-top: 2px; }
         .follow-list-empty { text-align: center; padding: 60px 20px; color: var(--nav-inactive); font-size: 1rem; }
+
+        /* ===== شات خاص ===== */
+        .chat-header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:16px 12px; border-bottom:1px solid var(--border); }
+        .chat-header h2 { margin:0;font-size:1rem; }
+        .chat-header small { color: var(--nav-inactive); display:block; margin-top:4px; font-size:0.83rem; }
+        .chat-action-btn { background: var(--accent); color: white; border: none; border-radius: 12px; padding: 10px 14px; cursor: pointer; font-weight: bold; }
+        .chat-panels { display:flex; gap:12px; height: calc(100vh - 130px); padding: 0 12px 12px; }
+        .chat-list-panel, .chat-room-panel { background: var(--card); border:1px solid var(--border); border-radius: 18px; overflow:hidden; }
+        .chat-list-panel { width: 36%; min-width: 260px; display:flex; flex-direction:column; }
+        .chat-room-panel { flex:1; display:flex; flex-direction:column; }
+        .chat-search-row { padding: 12px; border-bottom:1px solid var(--border); }
+        .chat-search-input { width:100%; padding:12px 14px; border-radius:12px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+        .chat-user-item, .chat-contact-item { display:flex; align-items:center; gap:12px; padding:12px; border-bottom:1px solid var(--border); cursor:pointer; transition: background 0.15s ease; }
+        .chat-user-item:hover, .chat-contact-item:hover { background: rgba(255,255,255,0.04); }
+        .chat-contact-item.selected { background: rgba(30, 144, 255, 0.14); }
+        .chat-contact-avatar, .chat-user-avatar { width:46px; height:46px; border-radius:50%; flex-shrink:0; overflow:hidden; background: var(--border); display:flex; align-items:center; justify-content:center; color: var(--text); font-weight:bold; font-size:1rem; }
+        .chat-contact-body { flex:1; min-width:0; }
+        .chat-contact-name { font-weight:bold; font-size:0.95rem; display:flex; align-items:center; gap:6px; }
+        .chat-contact-meta { color: var(--nav-inactive); font-size:0.82rem; margin-top:3px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .chat-contact-right { text-align:right; min-width: 60px; font-size:0.75rem; color:var(--nav-inactive); display:flex; flex-direction:column; align-items:flex-end; gap:8px; }
+        .unread-badge { background:#1e90ff; color:white; padding:4px 8px; border-radius:12px; font-size:0.72rem; font-weight:700; }
+        .chat-room-header { padding: 16px 16px 8px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px; }
+        .chat-room-title { font-weight:bold; font-size:1rem; }
+        .chat-room-status { color: var(--nav-inactive); font-size:0.82rem; }
+        .chat-messages-feed { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+        .chat-message { max-width:78%; padding:12px 14px; border-radius:18px; line-height:1.5; position:relative; }
+        .chat-message.sent { align-self:flex-end; background: #1e90ff; color:white; border-bottom-right-radius:4px; }
+        .chat-message.received { align-self:flex-start; background: var(--bg); color: var(--text); border-bottom-left-radius:4px; border:1px solid var(--border); }
+        .chat-message-time { display:block; margin-top:6px; font-size:0.72rem; color: rgba(255,255,255,0.78); }
+        .chat-message.received .chat-message-time { color: var(--nav-inactive); }
+        .chat-input-row { display:flex; gap:10px; padding:12px; border-top:1px solid var(--border); background: var(--card); }
+        .chat-input { flex:1; min-width:0; padding:12px 14px; border-radius:18px; border:1px solid var(--border); background:var(--bg); color:var(--text); }
+        .chat-send-btn { background: var(--accent); color: white; border:none; border-radius:18px; padding:0 18px; font-weight:bold; cursor:pointer; }
+        .chat-empty { padding: 18px 14px; color: var(--nav-inactive); font-size:0.95rem; text-align:center; }
+        @media (max-width: 900px) {
+            .chat-panels { flex-direction:column; height:auto; }
+            .chat-list-panel { width:100%; height:auto; }
+            .chat-room-panel { width:100%; min-height:420px; }
+        }
     </style>
 </head>
 <body>
@@ -483,7 +523,7 @@
             <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
         </div>
         <div id="notif-bell" class="header-action" onclick="openNotifications()" title="الإشعارات">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
             <div id="notif-dot" class="notif-dot"></div>
         </div>
     </div>
@@ -523,6 +563,40 @@
             <div class="boom-tab active">!BOOM</div>
         </div>
         <div id="boom-list" class="boom-container"></div>
+    </div>
+
+    <div id="sec-messages" class="section" style="padding:0;">
+        <div class="chat-header">
+            <div>
+                <h2>المراسلات</h2>
+                <small>دردشة خاصة بين المستخدمين وحالة النشاط</small>
+            </div>
+            <button class="chat-action-btn" onclick="refreshMessages()">تحديث</button>
+        </div>
+        <div class="chat-panels">
+            <div class="chat-list-panel">
+                <div class="chat-search-row">
+                    <input id="chat-user-search" class="chat-search-input" type="search" placeholder="ابحث عن مستخدم بالاسم أو اسم المستخدم" oninput="searchUsersForChat()">
+                </div>
+                <div id="chat-user-search-results" class="chat-user-list"></div>
+                <div id="chat-conversations-list"></div>
+            </div>
+            <div class="chat-room-panel">
+                <div id="chat-room-header" class="chat-room-header">
+                    <div>
+                        <div class="chat-room-title">اختر محادثة لبدء الدردشة</div>
+                        <div class="chat-room-status">يمكنك الآن إرسال رسالة خاصة</div>
+                    </div>
+                </div>
+                <div id="chat-messages-feed" class="chat-messages-feed">
+                    <div class="chat-empty">حدد مستخدماً من القائمة أو ابحث عن اسم لبدء محادثة.</div>
+                </div>
+                <div class="chat-input-row">
+                    <input id="chat-message-input" class="chat-input" type="text" placeholder="اكتب رسالة..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+                    <button class="chat-send-btn" onclick="sendChatMessage()">إرسال</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div id="sec-transfers" class="section" style="padding: 0;">
@@ -579,13 +653,17 @@
         <div>!BOOM</div>
     </div>
     <div id="nav-transfers" class="nav-item" onclick="showTab('transfers')">
-        <svg viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5M7 9h5v1H7V9z"/><path d="M16 3l2 2-6 6-2-2z"/></svg>
+        <svg viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5z"/></svg>
         <div>الانتقالات</div>
     </div>
     <div id="nav-more" class="nav-item" onclick="showTab('more')">
         <div class="notif-badge" id="more-badge"></div>
         <svg viewBox="0 0 24 24"><path d="M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z"/></svg>
         <div>المزيد</div>
+    </div>
+    <div id="nav-messages" class="nav-item" onclick="showTab('messages')">
+        <svg viewBox="0 0 24 24"><path d="M21 6H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h4l3 3 3-3h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1z"/></svg>
+        <div>مراسلة</div>
     </div>
 </nav>
 
@@ -880,7 +958,25 @@ CREATE TABLE IF NOT EXISTS story_hearts (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(story_id, user_id)
 );
-ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
+ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;
+
+-- 5) جدول الرسائل الخاصة
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  sender_id UUID NOT NULL,
+  receiver_id UUID NOT NULL,
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE messages DISABLE ROW LEVEL SECURITY;
+CREATE INDEX IF NOT EXISTS messages_sender_idx ON messages(sender_id);
+CREATE INDEX IF NOT EXISTS messages_receiver_idx ON messages(receiver_id);
+
+-- 6) حالة نشاط المستخدمين
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS online_status BOOLEAN DEFAULT FALSE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
+</div>
         <button onclick="_copyRlsSql()" id="rls-copy-btn" style="width:100%;margin-top:14px;background:#1e90ff;color:white;border:none;padding:13px;border-radius:12px;font-size:1rem;font-weight:bold;cursor:pointer;font-family:'Tajawal',sans-serif;">📋 نسخ الكود</button>
         <p style="color:#8e99a2;font-size:0.78rem;text-align:center;margin:10px 0 0;">بعد تشغيل الكود في Supabase، انشر الستوري مجدداً</p>
     </div>
@@ -904,9 +1000,8 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         <div class="sv-tap-right" onclick="svNext()"></div>
         <div class="sv-bottom-bar" id="sv-bottom-bar">
             <div class="sv-views-count" id="sv-views-count" style="cursor:pointer;display:none;" onclick="openStoryViewersList()"><span style="font-size:1.1rem;">👁</span> <span id="sv-views-num">0</span> مشاهدة</div>
-            <div id="sv-heart-btn" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);padding:8px 16px;border-radius:20px;cursor:pointer;transition:0.2s;" onclick="toggleStoryHeart()">
-                <span id="sv-heart-icon" style="font-size:1.2rem;">🤍</span>
-                <span id="sv-hearts-num" style="font-size:0.9rem;color:rgba(255,255,255,0.8);">0</span>
+            <div id="sv-heart-btn" style="display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.1);padding:10px;min-width:48px;min-height:48px;border-radius:50%;cursor:pointer;transition:0.2s;" onclick="toggleStoryHeart()">
+                <span id="sv-heart-icon" style="font-size:1.4rem;">🤍</span>
             </div>
             <div id="sv-add-btn" style="display:none;background:rgba(255,255,255,0.1);border:none;color:white;width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1.4rem;display:flex;align-items:center;justify-content:center;" onclick="openStoryEditor()">+</div>
             <button class="sv-delete-btn" id="sv-delete-btn" style="display:none;" onclick="deleteCurrentStory()">🗑️</button>
@@ -1088,13 +1183,18 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
             currentUser = data?.session?.user || null;
             if (currentUser) {
                 await fetchUserPoints();
+                await setUserOnlineStatus(true);
                 fetchNotifications();
                 _subscribeVerifiedRealtime(currentUser.id);
                 _subscribeNotificationsRealtime(currentUser.id);
             }
             updateAuthUI();
             _supabase.auth.onAuthStateChange(async (_event, session) => {
+                const previousUser = currentUser;
                 currentUser = session?.user || null;
+                if (!session && previousUser) {
+                    await setUserOnlineStatus(false, previousUser.id);
+                }
                 if (_verifiedRealtimeChannel) {
                     _supabase.removeChannel(_verifiedRealtimeChannel);
                     _verifiedRealtimeChannel = null;
@@ -1105,6 +1205,7 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
                 }
                 if (currentUser) {
                     await fetchUserPoints();
+                    await setUserOnlineStatus(true);
                     fetchNotifications();
                     _subscribeVerifiedRealtime(currentUser.id);
                     _subscribeNotificationsRealtime(currentUser.id);
@@ -1613,7 +1714,8 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         }
     }
 
-    function logout() {
+    async function logout() {
+        if (currentUser) await setUserOnlineStatus(false);
         currentUser = null; currentUserPoints = 0; isProfileEditMode = false;
         updateAuthUI();
         _supabase.auth.signOut().catch(e => console.log(e));
@@ -1632,6 +1734,12 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         initStoryEditor();
     });
 
+    window.addEventListener('beforeunload', () => {
+        if (currentUser) {
+            _supabase.from('profiles').update({ online_status: false, last_seen: new Date().toISOString() }).eq('id', currentUser.id);
+        }
+    });
+
     function showTab(t) {
         document.querySelectorAll('.section, .nav-item').forEach(el => el.classList.remove('active'));
         document.getElementById('main-header').style.display = (t === 'boom' || t === 'vote') ? 'none' : 'flex';
@@ -1641,6 +1749,7 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         else if(t==='n') loadNews();
         else if(t==='boom') loadBoomVideos();
         else if(t==='vote') loadVoting();
+        else if(t==='messages') loadMessages();
         else if(t==='transfers') loadTransfers();
     }
 
@@ -1868,6 +1977,238 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
                 </div>
             </div>`;
         }).join('');
+    }
+
+    let currentChatUserId = null;
+    let currentChatUserProfile = null;
+
+    function getProfileDisplayName(profile) {
+        if(!profile) return 'مستخدم';
+        return profile.full_name || profile.username || (profile.email ? profile.email.split('@')[0] : 'مستخدم');
+    }
+
+    function getProfileAvatarHtml(profile) {
+        const url = profile?.avatars_url || profile?.profile_image;
+        if(url) {
+            return `<img src="${url}" alt="${getProfileDisplayName(profile)}" style="width:100%;height:100%;object-fit:cover;">`;
+        }
+        const initials = getProfileDisplayName(profile).substring(0, 2).toUpperCase();
+        return `<div>${initials}</div>`;
+    }
+
+    function formatRelativeTime(timestamp) {
+        if(!timestamp) return 'غير متصل';
+        const diff = Date.now() - new Date(timestamp).getTime();
+        if(diff < 60000) return 'قبل لحظات';
+        if(diff < 3600000) return `قبل ${Math.round(diff / 60000)} دقيقة`;
+        if(diff < 86400000) return `قبل ${Math.round(diff / 3600000)} ساعة`;
+        return `آخر اتصال ${Math.round(diff / 86400000)} يوم`;
+    }
+
+    function getOnlineStatusLabel(profile) {
+        if(profile?.online_status) return 'متصل الآن';
+        if(profile?.last_seen) return formatRelativeTime(profile.last_seen);
+        return 'غير متصل';
+    }
+
+    async function setUserOnlineStatus(isOnline, userId = null) {
+        const id = userId || (currentUser && currentUser.id);
+        if(!id) return;
+        try {
+            await _supabase.from('profiles').update({ online_status: isOnline, last_seen: new Date().toISOString() }).eq('id', id);
+        } catch(e) {
+            console.log('Online status update failed', e.message || e);
+        }
+    }
+
+    async function refreshMessages() {
+        await loadMessages();
+    }
+
+    async function loadMessages() {
+        if(!currentUser) { openAuthModal(); return; }
+        await setUserOnlineStatus(true);
+        await Promise.all([loadChatUsers(), loadConversations()]);
+    }
+
+    async function searchUsersForChat() {
+        const term = document.getElementById('chat-user-search').value.trim();
+        await loadChatUsers(term);
+    }
+
+    async function loadChatUsers(searchTerm = '') {
+        if(!currentUser) return;
+        const list = document.getElementById('chat-user-search-results');
+        list.innerHTML = '<div class="chat-empty">جارِ البحث عن المستخدمين...</div>';
+        try {
+            let fields = 'id, full_name, username, avatars_url, profile_image, online_status, last_seen';
+            let query = _supabase.from('profiles').select(fields).neq('id', currentUser.id);
+            if(searchTerm) {
+                query = query.or(`full_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%`);
+            }
+            let { data, error } = await query.order('online_status', { ascending: false }).order('last_seen', { ascending: false }).limit(12);
+            if(error) {
+                let fallback = _supabase.from('profiles').select('id, full_name, username, avatars_url, profile_image').neq('id', currentUser.id);
+                if(searchTerm) {
+                    fallback = fallback.or(`full_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%`);
+                }
+                const fallbackResult = await fallback.limit(12);
+                data = fallbackResult.data;
+                error = fallbackResult.error;
+            }
+            if(error) throw error;
+            if(!data || !data.length) {
+                list.innerHTML = '<div class="chat-empty">لا يوجد نتائج بحث. حاول اسم آخر.</div>';
+                return;
+            }
+            list.innerHTML = data.map(profile => {
+                const displayName = getProfileDisplayName(profile);
+                return `<div class="chat-user-item" onclick="openChatWithUser('${profile.id}')">
+                    <div class="chat-user-avatar">${getProfileAvatarHtml(profile)}</div>
+                    <div class="chat-contact-body">
+                        <div class="chat-contact-name">${displayName}</div>
+                        <div class="chat-contact-meta">${getOnlineStatusLabel(profile)}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            list.innerHTML = '<div class="chat-empty">تعذر البحث الآن.</div>';
+            console.log('Search users error', e);
+        }
+    }
+
+    function formatChatTime(timestamp) {
+        const d = new Date(timestamp);
+        if(isNaN(d.getTime())) return '';
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${hours}:${minutes} ${d.getDate()}/${d.getMonth() + 1}`;
+    }
+
+    function escapeHtml(text) {
+        if(!text) return '';
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    async function loadConversations() {
+        if(!currentUser) return;
+        const list = document.getElementById('chat-conversations-list');
+        list.innerHTML = '<div class="chat-empty">جارِ تحميل المحادثات...</div>';
+        try {
+            const { data, error } = await _supabase.from('messages')
+                .select('sender_id,receiver_id,message,created_at,is_read')
+                .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`)
+                .order('created_at', { ascending: false });
+            if(error) throw error;
+            const convMap = {};
+            (data || []).forEach(msg => {
+                const otherId = msg.sender_id === currentUser.id ? msg.receiver_id : msg.sender_id;
+                const unread = ((msg.receiver_id === currentUser.id && !msg.is_read) ? 1 : 0) + (convMap[otherId]?.unread || 0);
+                if(!convMap[otherId] || new Date(msg.created_at) > new Date(convMap[otherId].created_at)) {
+                    convMap[otherId] = {
+                        otherId,
+                        latestMessage: msg.message,
+                        created_at: msg.created_at,
+                        unread,
+                        lastSenderId: msg.sender_id
+                    };
+                } else {
+                    convMap[otherId].unread = unread;
+                }
+            });
+            const counterpartIds = Object.keys(convMap);
+            if(!counterpartIds.length) {
+                list.innerHTML = '<div class="chat-empty">لا توجد محادثات حتى الآن. اختر مستخدماً من الأعلى للبدء.</div>';
+                return;
+            }
+            let { data: users, error: userError } = await _supabase.from('profiles').select('id, full_name, username, avatars_url, profile_image, online_status, last_seen').in('id', counterpartIds);
+            if(userError) {
+                const fallback = await _supabase.from('profiles').select('id, full_name, username, avatars_url, profile_image').in('id', counterpartIds);
+                users = fallback.data;
+                userError = fallback.error;
+            }
+            if(userError) throw userError;
+            const profiles = (users || []).reduce((acc, profile) => { acc[profile.id] = profile; return acc; }, {});
+            list.innerHTML = counterpartIds.map(id => {
+                const item = convMap[id];
+                const profile = profiles[id] || { id };
+                return `<div class="chat-contact-item ${currentChatUserId === id ? 'selected' : ''}" onclick="openChatWithUser('${id}')">
+                    <div class="chat-contact-avatar">${getProfileAvatarHtml(profile)}</div>
+                    <div class="chat-contact-body">
+                        <div class="chat-contact-name">${getProfileDisplayName(profile)}</div>
+                        <div class="chat-contact-meta">${escapeHtml(item.latestMessage)}</div>
+                    </div>
+                    <div class="chat-contact-right">
+                        ${item.unread ? `<span class="unread-badge">${item.unread}</span>` : ''}
+                        <small>${formatChatTime(item.created_at)}</small>
+                    </div>
+                </div>`;
+            }).join('');
+            if(!currentChatUserId) {
+                openChatWithUser(counterpartIds[0]);
+            }
+        } catch(e) {
+            list.innerHTML = '<div class="chat-empty">تعذر تحميل المحادثات.</div>';
+            console.log('Load conversations error', e);
+        }
+    }
+
+    async function openChatWithUser(otherUserId) {
+        if(!currentUser) { openAuthModal(); return; }
+        currentChatUserId = otherUserId;
+        document.getElementById('chat-message-input').value = '';
+        try {
+            let { data: profile, error: profileError } = await _supabase.from('profiles').select('id, full_name, username, avatars_url, profile_image, online_status, last_seen').eq('id', otherUserId).maybeSingle();
+            if(profileError) {
+                const fallback = await _supabase.from('profiles').select('id, full_name, username, avatars_url, profile_image').eq('id', otherUserId).maybeSingle();
+                profile = fallback.data;
+                profileError = fallback.error;
+            }
+            currentChatUserProfile = profile || { id: otherUserId };
+            const header = document.getElementById('chat-room-header');
+            header.innerHTML = `<div><div class="chat-room-title">${getProfileDisplayName(currentChatUserProfile)}</div><div class="chat-room-status">${getOnlineStatusLabel(currentChatUserProfile)}</div></div>`;
+            const { data: messages, error: messagesError } = await _supabase.from('messages')
+                .select('*')
+                .in('sender_id', [currentUser.id, otherUserId])
+                .in('receiver_id', [currentUser.id, otherUserId])
+                .order('created_at', { ascending: true });
+            if(messagesError) throw messagesError;
+            renderChatMessages(messages || []);
+            await _supabase.from('messages').update({ is_read: true }).eq('receiver_id', currentUser.id).eq('sender_id', otherUserId).eq('is_read', false);
+            await loadConversations();
+        } catch(e) {
+            console.log('Open chat error', e);
+        }
+    }
+
+    function renderChatMessages(messages) {
+        const feed = document.getElementById('chat-messages-feed');
+        if(!messages || !messages.length) {
+            feed.innerHTML = '<div class="chat-empty">لا توجد رسائل بعد. ابدأ بكتابة رسالة.</div>';
+            return;
+        }
+        feed.innerHTML = messages.map(msg => {
+            const isSent = msg.sender_id === currentUser.id;
+            return `<div class="chat-message ${isSent ? 'sent' : 'received'}"><div>${escapeHtml(msg.message)}</div><span class="chat-message-time">${formatChatTime(msg.created_at)}</span></div>`;
+        }).join('');
+        feed.scrollTop = feed.scrollHeight;
+    }
+
+    async function sendChatMessage() {
+        if(!currentUser) { openAuthModal(); return; }
+        if(!currentChatUserId) { alert('حدد مستخدماً لبدء المحادثة.'); return; }
+        const input = document.getElementById('chat-message-input');
+        const text = input.value.trim();
+        if(!text) return;
+        input.value = '';
+        try {
+            await _supabase.from('messages').insert({ sender_id: currentUser.id, receiver_id: currentChatUserId, message: text });
+            await _supabase.from('notifications').insert({ user_id: currentChatUserId, actor_id: currentUser.id, title: 'رسالة جديدة', message: `لديك رسالة جديدة من ${getProfileDisplayName({ full_name: localStorage.getItem('profile_name_' + currentUser.id), username: localStorage.getItem('profile_username_' + currentUser.id) || currentUser.email.split('@')[0] })}` });
+            await openChatWithUser(currentChatUserId);
+        } catch(e) {
+            console.log('Send message error', e);
+            input.value = text;
+        }
     }
 
     function openMatch(id, hTeam, aTeam, started, hLogo, aLogo, hScore, aScore, matchType) {
@@ -2298,6 +2639,7 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
             if (item.assists > 0) statsIcons += `<div class="pl-badge badge-assist">👟${item.assists>1?item.assists:''}</div>`;
             if (item.yellow_cards > 0) statsIcons += `<div class="pl-badge badge-card badge-yellow"></div>`;
             if (item.red_card) statsIcons += `<div class="pl-badge badge-card badge-red"></div>`;
+            if (item.is_injured) statsIcons += `<div class="pl-badge badge-injury">🤕</div>`;
             let motmStar = '';
             if (item['pl-motm'] === true || item['pl-motm'] === 1) motmStar = `<div class="pl-motm-star">⭐</div>`;
             const getHtml = (showRate) => `<div onclick='openDetails(${JSON.stringify(item)})'><div class="pl-img-w">${'<div class="pl-number">'+p.player_number+'</div>'}${motmStar}${statsIcons}<img src="${p.player_image}">${showRate ? `<div class="pl-rate" style="${getRatingStyle(item.rating || '6.0')}">${item.rating || '6.0'}</div>` : ''}</div><span class="pl-name">${p.player_name}</span></div>`;
@@ -2990,7 +3332,7 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
             if (error || !stories || stories.length === 0) {
                 // إظهار زر الإضافة فقط إذا كان المستخدم مسجلاً
                 if (currentUser) {
-                    const myAvatar = localStorage.getItem('profile_image_' + currentUser.id) || null;
+                    const myAvatar = localStorage.getItem('profile_image_' + currentUser.id) || currentUser?.user_metadata?.avatar_url || null;
                     const myName = localStorage.getItem('profile_name_' + currentUser.id) || 'أنت';
                     bar.style.display = 'flex';
                     bar.innerHTML = _buildAddStoryCircle(myAvatar, myName);
@@ -3020,14 +3362,14 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
             if (currentUser) {
                 const myStories = grouped[currentUser.id];
                 const myProfile = profileMap[currentUser.id];
-                const myAvatar = myProfile?.avatars_url || myProfile?.profile_image || localStorage.getItem('profile_image_' + currentUser.id) || null;
+                const myAvatar = localStorage.getItem('profile_image_' + currentUser.id) || myProfile?.avatars_url || myProfile?.profile_image || currentUser?.user_metadata?.avatar_url || null;
                 const myName = localStorage.getItem('profile_name_' + currentUser.id) || 'أنت';
                 if (myStories && myStories.length > 0) {
                     const initials = myName.substring(0, 2);
                     html += `<div class="story-circle" onclick="_openStoryViewerForUser('${currentUser.id}')">
                         <div class="story-avatar-ring">
                             <div class="story-avatar-inner">
-                                ${myAvatar ? `<img src="${myAvatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1.1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1.1rem;">${initials}</span>`}
+                                ${myAvatar ? `<img src="${myAvatar}" onerror="this.outerHTML='<span style=&quot;color:white;font-weight:bold;font-size:1.1rem;&quot;>${initials}</span>'" alt="${myName}">` : `<span style="color:white;font-weight:bold;font-size:1.1rem;">${initials}</span>`}
                             </div>
                         </div>
                         <span class="story-name">ستوريك</span>
@@ -3049,7 +3391,7 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
                 html += `<div class="story-circle" onclick="_openStoryViewerForUser('${uid}')">
                     <div class="story-avatar-ring ${isSeen ? 'seen' : ''}">
                         <div class="story-avatar-inner">
-                            ${avatar ? `<img src="${avatar}" onerror="this.outerHTML='<span style=color:white;font-weight:bold;font-size:1rem;>${initials}</span>'" alt="">` : `<span style="color:white;font-weight:bold;font-size:1rem;">${initials}</span>`}
+                            ${avatar ? `<img src="${avatar}" onerror="this.outerHTML='<span style=&quot;color:white;font-weight:bold;font-size:1rem;&quot;>${initials}</span>'" alt="${name}">` : `<span style="color:white;font-weight:bold;font-size:1rem;">${initials}</span>`}
                         </div>
                     </div>
                     <span class="story-name">${name}</span>
@@ -3171,7 +3513,8 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         progContainer.innerHTML = userStories.map((_, i) => `
             <div class="sv-seg">
                 <div class="sv-seg-fill" id="sv-fill-${i}" style="width:${i < _svStoryIndex ? '100%' : '0%'}"></div>
-            </div>`).join('');
+            </اربط كل ايقونات وسمايلات التطبيق بمكتبة phosphoricons
+            div>`).join('');
 
         // تشغيل شريط التقدم
         const fill = document.getElementById(`sv-fill-${_svStoryIndex}`);
@@ -3279,24 +3622,25 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         }
         document.getElementById('sv-heart-btn').style.display = 'flex';
 
-        const heartsEl = document.getElementById('sv-hearts-num');
         const heartIcon = document.getElementById('sv-heart-icon');
 
-        // جلب عدد القلوب
+        // جلب حالة القلب للمستخدم الحالي
         try {
-            const { count, error } = await _supabase.from('story_hearts')
-                .select('*', { count: 'exact', head: true })
-                .eq('story_id', story.id);
+            const { data: heartData, error: heartError } = await _supabase.from('story_hearts')
+                .select('id')
+                .eq('story_id', story.id)
+                .eq('user_id', userId)
+                .maybeSingle();
 
-            if (error) {
-                console.log('Story hearts count error:', error.message);
-                if (heartsEl) heartsEl.textContent = '0';
+            if (!heartError) {
+                heartIcon.textContent = heartData ? '❤️' : '🤍';
             } else {
-                if (heartsEl && count !== null) heartsEl.textContent = count;
+                console.log('Story hearts fetch error:', heartError.message);
+                heartIcon.textContent = '🤍';
             }
         } catch(e) {
-            console.log('Story hearts count failed:', e.message);
-            if (heartsEl) heartsEl.textContent = '0';
+            console.log('Story hearts fetch failed:', e.message);
+            heartIcon.textContent = '🤍';
         }
 
         // التحقق إذا وضع المستخدم قلب
@@ -3437,7 +3781,6 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
         const story = window._currentStoryViewing;
         const userId = currentUser.id;
         const heartIcon = document.getElementById('sv-heart-icon');
-        const heartsEl = document.getElementById('sv-hearts-num');
 
         const isHearted = heartIcon.textContent === '❤️';
 
@@ -3455,7 +3798,6 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
                 }
 
                 heartIcon.textContent = '🤍';
-                heartsEl.textContent = Math.max(0, parseInt(heartsEl.textContent) - 1);
             } else {
                 // إضافة قلب
                 const { error } = await _supabase.from('story_hearts')
@@ -3467,7 +3809,6 @@ ALTER TABLE story_hearts DISABLE ROW LEVEL SECURITY;</div>
                 }
 
                 heartIcon.textContent = '❤️';
-                heartsEl.textContent = parseInt(heartsEl.textContent) + 1;
 
                 // إرسال إشعار لصاحب الستوري إذا لم يكن هو نفسه
                 if (story.user_id !== userId) {
