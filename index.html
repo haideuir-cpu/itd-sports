@@ -1336,6 +1336,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
             if (currentUser) {
                 await fetchUserPoints();
                 await setUserOnlineStatus(true);
+                await loadFollowingSet();
                 fetchNotifications();
                 _subscribeVerifiedRealtime(currentUser.id);
                 _subscribeNotificationsRealtime(currentUser.id);
@@ -1349,6 +1350,8 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                 currentUser = session?.user || null;
                 if (!session && previousUser) {
                     await setUserOnlineStatus(false, previousUser.id);
+                    _followingSet = new Set();
+                    _followingSetLoaded = false;
                 }
                 if (_verifiedRealtimeChannel) {
                     _supabase.removeChannel(_verifiedRealtimeChannel);
@@ -1365,6 +1368,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                 if (currentUser) {
                     await fetchUserPoints();
                     await setUserOnlineStatus(true);
+                    await loadFollowingSet();
                     fetchNotifications();
                     _subscribeVerifiedRealtime(currentUser.id);
                     _subscribeNotificationsRealtime(currentUser.id);
@@ -3261,6 +3265,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
     let _followingSet = new Set();
     let _followersSet = new Set();
     let _chatAllowedIds = new Set();
+    let _followingSetLoaded = false;
 
     function openSearchModal() {
         const modal = document.getElementById('search-modal');
@@ -3274,11 +3279,20 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
     }
 
     async function loadFollowingSet() {
+        _followingSetLoaded = false;
         if (!currentUser) return;
         try {
             const { data } = await _supabase.from('follows').select('following_id').eq('follower_id', currentUser.id);
-            if (data) _followingSet = new Set(data.map(r => r.following_id));
-        } catch(e) {}
+            if (data) {
+                _followingSet = new Set(data.map(r => r.following_id));
+            } else {
+                _followingSet = new Set();
+            }
+            _followingSetLoaded = true;
+        } catch(e) {
+            _followingSet = new Set();
+            _followingSetLoaded = false;
+        }
     }
 
     async function loadChatAllowedIds() {
@@ -3415,6 +3429,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
             if (isOwnProfile) { followBtn.textContent = 'ملفك الشخصي'; followBtn.className = 'user-follow-btn own'; }
             else if (!currentUser) { followBtn.textContent = 'متابعة'; followBtn.className = 'user-follow-btn'; }
             else {
+                if (!_followingSetLoaded) await loadFollowingSet();
                 const isFollowing = _followingSet.has(userId);
                 followBtn.textContent = isFollowing ? 'متابَع ✓' : 'متابعة';
                 followBtn.className = `user-follow-btn ${isFollowing ? 'following' : ''}`;
