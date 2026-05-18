@@ -60,27 +60,34 @@ self.addEventListener('message', event => {
   }
 });
 
-// ط¥ط¶ط§ظپط© ظ…ط¹ط§ظ„ط¬ط© ط§ظ„ط¥ط´ط¹ط§ط±ط§طھ
 self.addEventListener('push', event => {
-  if (event.data) {
-    const data = event.data.json();
-    const options = {
-      body: data.body,
-      icon: data.icon || '/icon-192.png',
-      badge: '/icon-192.png',
-      vibrate: [200, 100, 200],
-      data: data.data || {},
-      requireInteraction: true
-    };
-    event.waitUntil(
-      self.registration.showNotification(data.title, options)
-    );
-  }
+  const data = event.data?.json?.() || {};
+  const title = data.title || 'رسالة جديدة';
+  const options = {
+    body: data.body || 'لديك رسالة جديدة. افتح التطبيق للرد.',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    data: {
+      url: data.url || '/index.html',
+      senderId: data.senderId || null
+    }
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const targetUrl = event.notification.data?.url || '/index.html';
   event.waitUntil(
-    clients.openWindow(event.notification.data.url || '/')
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
   );
 });
