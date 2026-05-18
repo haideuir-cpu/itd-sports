@@ -62,27 +62,41 @@ self.addEventListener('message', event => {
 
 self.addEventListener('push', event => {
   const data = event.data?.json?.() || {};
+  const conversationId = data.conversationId || data.senderId || 'default-conversation';
   const title = data.title || 'رسالة جديدة';
   const options = {
     body: data.body || 'لديك رسالة جديدة. افتح التطبيق للرد.',
     icon: 'icon-192.png',
     badge: 'icon-192.png',
+    tag: `conversation-${conversationId}`,
+    renotify: true,
+    vibrate: [100, 50, 100],
+    timestamp: Date.now(),
     data: {
       url: data.url || '/index.html',
-      senderId: data.senderId || null
-    }
+      senderId: data.senderId || null,
+      conversationId,
+      conversationName: data.conversationName || title
+    },
+    actions: [
+      { action: 'open_chat', title: 'فتح المحادثة' }
+    ]
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', event => {
-  event.notification.close();
+  const action = event.action;
   const targetUrl = event.notification.data?.url || '/index.html';
+  event.notification.close();
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
       for (const client of windowClients) {
-        if (client.url.includes(targetUrl) && 'focus' in client) {
-          return client.focus();
+        if ('focus' in client) {
+          if (client.url.includes(targetUrl)) {
+            client.focus();
+            return client;
+          }
         }
       }
       if (clients.openWindow) {
