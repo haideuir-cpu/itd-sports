@@ -511,6 +511,10 @@
         .chat-story-row::-webkit-scrollbar { display: none; }
         .chat-story-item { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; width: 78px; min-width: 78px; gap: 8px; text-align:center; cursor: pointer; }
         .chat-story-avatar { width: 78px; height: 78px; border-radius: 50%; padding: 3px; background: linear-gradient(135deg, #ffdc5c, #ff7b00, #c44cff); display:flex; align-items:center; justify-content:center; }
+        #chat-bubble { position: fixed; bottom: calc(env(safe-area-inset-bottom, 16px) + 16px); right: calc(env(safe-area-inset-right, 16px) + 16px); width: 62px; height: 62px; border-radius: 50%; background: linear-gradient(135deg, #00d2b5, #1e90ff); display: none; align-items: center; justify-content: center; box-shadow: 0 20px 38px rgba(0,0,0,0.28); z-index: 11000; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        #chat-bubble:hover { transform: translateY(-3px); box-shadow: 0 24px 48px rgba(0,0,0,0.32); }
+        #chat-bubble .bubble-icon { color: white; font-size: 1.3rem; }
+        #chat-bubble-badge { position: absolute; top: 10px; right: 10px; min-width: 18px; height: 18px; padding: 0 6px; border-radius: 999px; background: #ff4d4d; color: white; font-size: 0.72rem; font-weight: 900; display: none; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(255,255,255,0.08); }
         .chat-story-avatar img, .chat-story-avatar .story-init { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 3px solid #0b0e14; background: #121821; display:flex; align-items:center; justify-content:center; color: #f5f7fb; font-weight: 900; font-size: 1rem; }
         .chat-story-label { color: #f5f7fb; font-size: 0.75rem; font-weight: 700; white-space: normal; line-height: 1.2; }
         .chat-story-status { display:inline-flex; align-items:center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(29,155,240,0.12); color: #1d9bf0; font-size: 0.7rem; font-weight: 700; }
@@ -670,7 +674,6 @@
                             <div class="action-sheet-title">خيارات الرسالة</div>
                             <div id="chat-action-subtitle" class="action-sheet-subtitle">اختر إجراءً للرسالة المحددة.</div>
                             <button class="action-sheet-btn delete" onclick="deleteChatMessage()">حذف الرسالة</button>
-                            <button class="action-sheet-btn forward" onclick="forwardChatMessage()">إعادة التوجيه</button>
                             <button class="action-sheet-btn cancel" onclick="hideChatMessageActions()">إلغاء</button>
                         </div>
                     </div>
@@ -752,6 +755,13 @@
         <div>المزيد</div>
     </div>
     </nav>
+
+<div id="chat-bubble" onclick="toggleChatBubble()" title="مراسلة سريعة">
+    <div>
+        <span class="bubble-icon"><i class="fa-solid fa-comment-dots"></i></span>
+        <div id="chat-bubble-badge"></div>
+    </div>
+</div>
 
 <!-- نوافذ المصادقة -->
 <div id="auth-modal" class="modal" onclick="if(event.target == this) closeModal('auth-modal')">
@@ -963,8 +973,9 @@
     <div id="follow-list-body" style="flex:1; overflow-y:auto;"></div>
 </div>
 
+
 <!-- محرر الستوري -->
-<div id="story-editor-modal" style="display:none; position:fixed; inset:0; background:#000; z-index:6000; flex-direction:column;">
+<div id="story-editor-modal" class="modal" onclick="if(event.target == this) closeStoryEditor()">
     <div class="story-editor-header">
         <button onclick="closeStoryEditor()" style="background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
         <span style="color:white;font-weight:bold;font-size:1rem;">إضافة ستوري</span>
@@ -1128,6 +1139,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
     const supabaseUrl = 'https://tdheaqtddxxsenmmlrkp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkaGVhcXRkZHh4c2VubW1scmtwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MjcxNjEsImV4cCI6MjA4OTAwMzE2MX0.nFfL7_e43xY_Avm36dpS7o30OD8V8GWg8L-tLaIoaPM';
     const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    const VAPID_PUBLIC_KEY = 'REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY';
 
     // ضغط الصور
     function compressImageToBase64(file, maxSize = 400, quality = 0.82) {
@@ -1314,6 +1326,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 
     let _verifiedRealtimeChannel = null;
     let _notificationsRealtimeChannel = null;
+    let _messagesRealtimeChannel = null;
 
     async function checkUserSession() {
         try {
@@ -1326,6 +1339,9 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                 fetchNotifications();
                 _subscribeVerifiedRealtime(currentUser.id);
                 _subscribeNotificationsRealtime(currentUser.id);
+                _subscribeMessagesRealtime(currentUser.id);
+                refreshChatUnreadCount();
+                initBackgroundNotifications();
             }
             updateAuthUI();
             _supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -1342,12 +1358,19 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                     _supabase.removeChannel(_notificationsRealtimeChannel);
                     _notificationsRealtimeChannel = null;
                 }
+                if (_messagesRealtimeChannel) {
+                    _supabase.removeChannel(_messagesRealtimeChannel);
+                    _messagesRealtimeChannel = null;
+                }
                 if (currentUser) {
                     await fetchUserPoints();
                     await setUserOnlineStatus(true);
                     fetchNotifications();
                     _subscribeVerifiedRealtime(currentUser.id);
                     _subscribeNotificationsRealtime(currentUser.id);
+                    _subscribeMessagesRealtime(currentUser.id);
+                    refreshChatUnreadCount();
+                    initBackgroundNotifications();
                 }
                 updateAuthUI();
                 if(document.getElementById('sec-n').classList.contains('active')) {
@@ -1396,6 +1419,110 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                 // يمكن إضافة إشعار toast هنا إذا أردت
             })
             .subscribe();
+    }
+
+    function _subscribeMessagesRealtime(userId) {
+        if (_messagesRealtimeChannel) return;
+        _messagesRealtimeChannel = _supabase
+            .channel('messages-' + userId)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${userId}` }, payload => {
+                const msg = payload.new;
+                if (!msg || !currentUser || msg.receiver_id !== currentUser.id || msg.sender_id === currentUser.id) return;
+                refreshChatUnreadCount();
+                if (document.getElementById('sec-messages')?.classList.contains('active') && currentChatUserId === msg.sender_id) {
+                    openChatWithUser(msg.sender_id);
+                } else {
+                    loadConversations(false).catch(() => {});
+                }
+                showIncomingMessageNotification(msg.sender_id, msg);
+            })
+            .subscribe();
+    }
+
+    async function refreshChatUnreadCount() {
+        if (!currentUser) return;
+        try {
+            const { count, error } = await _supabase.from('messages')
+                .select('id', { count: 'exact', head: true })
+                .eq('receiver_id', currentUser.id)
+                .eq('is_read', false);
+            if (!error) {
+                updateChatBubbleBadge(count || 0);
+            }
+        } catch (err) {
+            console.log('Refresh unread count error', err);
+        }
+    }
+
+    function initBackgroundNotifications() {
+        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    subscribeToPushNotifications().catch(() => {});
+                }
+            }).catch(() => {});
+        } else if (Notification.permission === 'granted') {
+            subscribeToPushNotifications().catch(() => {});
+        }
+    }
+
+    async function subscribeToPushNotifications() {
+        if (!navigator.serviceWorker.controller) {
+            await navigator.serviceWorker.ready;
+        }
+        const registration = await navigator.serviceWorker.ready;
+        if (!registration.pushManager) return;
+        if (!VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY === 'REPLACE_WITH_YOUR_VAPID_PUBLIC_KEY') {
+            console.warn('Push subscription requires a valid VAPID public key.');
+            return;
+        }
+        const existingSubscription = await registration.pushManager.getSubscription();
+        if (existingSubscription) return existingSubscription;
+        const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+        console.log('Push subscription:', subscription);
+        // هنا يمكن إرسال بيانات الاشتراك إلى الخادم أو تخزينها في Supabase.
+        return subscription;
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    async function showIncomingMessageNotification(senderId, message) {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        let senderName = 'مستخدم';
+        try {
+            const { data: profile } = await _supabase.from('profiles').select('full_name,username').eq('id', senderId).maybeSingle();
+            if (profile) senderName = getProfileDisplayName(profile);
+        } catch (e) {
+            console.log('Notification sender lookup failed', e);
+        }
+        let body = '';
+        const parsed = parseChatMessageContent(message.message);
+        if (parsed && parsed.type === 'image') {
+            body = 'أرسل لك صورة.';
+        } else {
+            body = message.message ? String(message.message).slice(0, 80) : 'لديك رسالة جديدة.';
+        }
+        try {
+            new Notification(`رسالة جديدة من ${senderName}`, {
+                body,
+                icon: '/icon-192.png'
+            });
+        } catch (e) {
+            console.log('Show notification failed', e);
+        }
     }
 
     let currentUserIsVerified = false;
@@ -1883,6 +2010,9 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                 if(messageId) showChatMessageActions(messageId, senderId, messageText, messageUrl);
             });
         }
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshChatUnreadCount();
+        });
     });
 
     window.addEventListener('beforeunload', () => {
@@ -2189,7 +2319,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
     async function loadMessages() {
         if(!currentUser) { openAuthModal(); return; }
         await setUserOnlineStatus(true);
-        await Promise.all([loadChatUsers(), loadConversations()]);
+        await Promise.all([loadChatUsers(), loadConversations(false)]);
     }
 
     async function searchUsersForChat() {
@@ -2267,7 +2397,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
         return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    async function loadConversations() {
+    async function loadConversations(autoOpenFirst = false) {
         if(!currentUser) return;
         await loadChatAllowedIds();
         const list = document.getElementById('chat-conversations-list');
@@ -2328,13 +2458,34 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
                     </div>
                 </div>`;
             }).join('');
-            if(!currentChatUserId) {
+            if(!currentChatUserId && autoOpenFirst && counterpartIds.length) {
                 openChatWithUser(counterpartIds[0]);
             }
+            updateChatBubbleBadge(Object.values(convMap).reduce((sum, item) => sum + (item.unread || 0), 0));
         } catch(e) {
+            updateChatBubbleBadge(0);
             list.innerHTML = '<div class="chat-empty">تعذر تحميل المحادثات.</div>';
             console.log('Load conversations error', e);
         }
+    }
+
+    function updateChatBubbleBadge(count) {
+        const bubble = document.getElementById('chat-bubble');
+        const badge = document.getElementById('chat-bubble-badge');
+        if(!badge || !bubble) return;
+        if(count > 0) {
+            bubble.style.display = 'flex';
+            badge.style.display = 'flex';
+            badge.textContent = count > 99 ? '99+' : count;
+        } else {
+            badge.style.display = 'none';
+            bubble.style.display = 'none';
+        }
+    }
+
+    function toggleChatBubble() {
+        showTab('messages');
+        loadMessages();
     }
 
     async function openChatWithUser(otherUserId) {
@@ -2429,6 +2580,7 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
         selectedChatMessageUrl = null;
         document.getElementById('chat-message-actions').classList.remove('visible');
     }
+
 
     async function deleteChatMessage() {
         if(!selectedChatMessageId) return;
@@ -4167,6 +4319,12 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
     function closeModal(id, fromPopState) {
         document.getElementById(id).style.display = 'none';
         if (!fromPopState && history.state && history.state.modal === id) history.back();
+    }
+
+    function closeForwardModal() {
+        const modal = document.getElementById('forward-modal');
+        if(modal) modal.style.display = 'none';
+        if (history.state && history.state.modal === 'forward-modal') history.back();
     }
 
     window.addEventListener('popstate', function(e) {
